@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+*.egg
+.venv/
+venv/
+*.db
+
+# Node
+node_modules/
+frontend/dist/
+
+# Uploads & temp
+uploads/
+*.log
+import_debug.log
+
+# Environment
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+debug_body.json
+e2e_body.json
+test_import.json
