@@ -19,6 +19,7 @@ from app.schemas.upload import (
     UploadHistoryItem,
 )
 from app.services.import_service import import_from_excel, preview_excel, truncate_leads
+from app.services.store_mapping_service import get_unmatched_merchants
 from app.services.upload_service import get_assembly_progress, save_chunk
 
 router = APIRouter(prefix="/api", tags=["upload"])
@@ -78,6 +79,16 @@ async def upload_import(
 
         result = await import_from_excel(db, req.upload_id, req.mapping)
         logger.info(f"Import success: {result['total_rows']} rows")
+
+        # Check mapping coverage
+        try:
+            mapping_status = await get_unmatched_merchants(db)
+            result["mapping_coverage"] = mapping_status["coverage"]
+            result["unmatched_stores"] = mapping_status["unmatched_merchants"]
+        except Exception:
+            result["mapping_coverage"] = 0
+            result["unmatched_stores"] = []
+
         return result
     except Exception as e:
         logger.exception(f"Import failed: {e}")

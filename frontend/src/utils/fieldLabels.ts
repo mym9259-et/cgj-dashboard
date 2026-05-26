@@ -62,7 +62,17 @@ export const FILTERABLE_FIELDS = [
   "merchant_name", "payment_method", "owner_type", "product_years", "fuel_type",
   "create_method", "referrer", "residence", "occupation", "customer_type",
   "is_store_product", "is_abnormal",
+  "lingpao_region", "store_province", "store_city", "is_lingpao", "store_manager",
 ];
+
+// Additional labels for store mapping fields
+export const EXTRA_LABELS: Record<string, string> = {
+  lingpao_region: "零跑大区",
+  store_province: "省",
+  store_city: "市",
+  is_lingpao: "是否零跑",
+  store_manager: "门店总经理",
+};
 
 export const FIELD_OPERATORS: Record<string, string[]> = {
   default: ["eq", "neq", "in", "nin"],
@@ -72,5 +82,5 @@ export const FIELD_OPERATORS: Record<string, string[]> = {
 };
 
 export function getFieldLabel(field: string): string {
-  return FIELD_LABELS[field] || field;
+  return FIELD_LABELS[field] || EXTRA_LABELS[field] || field;
 }

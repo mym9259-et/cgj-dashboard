@@ -1,4 +1,4 @@
-"""Dashboard data APIs: overview, funnel, orders, performance."""
+"""Dashboard data APIs: overview, funnel, orders, performance, compare."""
 
 import json
 from datetime import date
@@ -15,6 +15,7 @@ from app.schemas.dashboard import (
     PerformanceDetail,
     PerformanceRanking,
 )
+from app.services.compare_service import get_comparison
 from app.services.dashboard_service import get_distinct_values, get_kpi_data, get_trend_data
 from app.services.funnel_service import get_funnel_comparison, get_funnel_data
 from app.services.order_service import get_order_structure
@@ -112,6 +113,30 @@ async def dashboard_performance_detail(
 ):
     """Get detailed performance for a single salesperson."""
     return await get_performance_detail(db, salesperson, start_date, end_date)
+
+
+@router.post("/compare")
+async def compare_data(
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+):
+    """Compare metrics across store dimensions."""
+    # Parse date strings to date objects
+    sd = body.get("start_date")
+    ed = body.get("end_date")
+    start_date = date.fromisoformat(sd) if sd else None
+    end_date = date.fromisoformat(ed) if ed else None
+
+    return await get_comparison(
+        db,
+        dimension=body.get("dimension", "lingpao_region"),
+        objects=body.get("objects", []),
+        metrics=body.get("metrics", ["leads", "deals"]),
+        filters=body.get("filters"),
+        filter_logic=body.get("filter_logic", "AND"),
+        start_date=start_date,
+        end_date=end_date,
+    )
 
 
 @router.get("/metadata/distinct-values", response_model=DistinctValuesResponse)

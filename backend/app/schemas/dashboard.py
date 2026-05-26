@@ -32,6 +32,9 @@ class KpiResponse(BaseModel):
     refund_count: int = 0
     refund_rate: float = 0.0
     refund_amount: float = 0.0
+    delivery_penetration: float = 0.0
+    contact_penetration: float = 0.0
+    contact_rate: float = 0.0
 
 
 class TrendItem(BaseModel):
@@ -41,6 +44,11 @@ class TrendItem(BaseModel):
     deals: int = 0
     revenue: float = 0.0
     refunds: int = 0
+    delivery_penetration: float = 0.0
+    contact_penetration: float = 0.0
+    contact_rate: float = 0.0
+    delivery_penetration_ma7: float = 0.0
+    contact_penetration_ma7: float = 0.0
 
 
 class DashboardOverview(BaseModel):
@@ -110,6 +118,9 @@ class RankingItem(BaseModel):
     revenue: float
     avg_deal: float
     contacted_rate: float
+    delivery_penetration: float = 0.0
+    contact_penetration: float = 0.0
+    merchant_name: str = ""
     refunds: int
     rank: int
 
@@ -121,7 +132,8 @@ class PerformanceRanking(BaseModel):
 
 class PerformanceDetail(BaseModel):
     salesperson: str
-    summary: RankingItem
+    summary: RankingItem | None = None
+    merchant_name: str = ""
     monthly_trend: list[TrendItem]
     by_product: list[dict]
     by_model: list[dict]

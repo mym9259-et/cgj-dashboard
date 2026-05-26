@@ -29,6 +29,8 @@ export interface ImportResult {
   valid_rows: number;
   error_rows: number;
   errors: Array<{ row: number; errors: string[] }>;
+  unmatched_stores?: string[];
+  mapping_coverage?: number;
 }
 
 export interface UploadStatus {

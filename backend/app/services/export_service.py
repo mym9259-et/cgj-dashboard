@@ -12,7 +12,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.constants import get_all_field_labels
 from app.models.lead import Lead
-from app.services.dashboard_service import _build_where_clauses, _apply_clauses
+from app.services.dashboard_service import (
+    _build_where_clauses, _apply_clauses, _apply_store_join_if_needed,
+)
 
 
 async def export_excel(
@@ -100,8 +102,9 @@ async def _query_data(
     end_date: date | None,
 ) -> list[dict]:
     """Query leads with filters and return as dicts."""
-    clauses = _build_where_clauses(filters, filter_logic, start_date, end_date)
+    clauses, needs_join = _build_where_clauses(filters, filter_logic, start_date, end_date)
     query = select(Lead)
+    query = _apply_store_join_if_needed(query, needs_join)
     query = _apply_clauses(query, clauses)
     query = query.limit(100000)  # Safety limit
 

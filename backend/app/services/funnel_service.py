@@ -6,7 +6,9 @@ from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.lead import Lead
-from app.services.dashboard_service import _build_where_clauses, _apply_clauses
+from app.services.dashboard_service import (
+    _build_where_clauses, _apply_clauses, _apply_store_join_if_needed,
+)
 
 
 async def get_funnel_data(
@@ -25,17 +27,20 @@ async def get_funnel_data(
 
 
 async def _funnel_overall(db, filters, filter_logic, start_date, end_date) -> dict:
-    clauses = _build_where_clauses(filters, filter_logic, start_date, end_date)
+    clauses, needs_join = _build_where_clauses(filters, filter_logic, start_date, end_date)
 
     total_stmt = select(func.count()).select_from(Lead)
+    total_stmt = _apply_store_join_if_needed(total_stmt, needs_join)
     total_stmt = _apply_clauses(total_stmt, clauses)
     total = await db.scalar(total_stmt) or 0
 
     contacted_stmt = select(func.count()).select_from(Lead)
+    contacted_stmt = _apply_store_join_if_needed(contacted_stmt, needs_join)
     contacted_stmt = _apply_clauses(contacted_stmt, clauses + [Lead.contact_status == "已触客"])
     contacted = await db.scalar(contacted_stmt) or 0
 
     deal_stmt = select(func.count()).select_from(Lead)
+    deal_stmt = _apply_store_join_if_needed(deal_stmt, needs_join)
     deal_stmt = _apply_clauses(deal_stmt, clauses + [Lead.deal_status == "已成交"])
     deals = await db.scalar(deal_stmt) or 0
 
@@ -49,7 +54,7 @@ async def _funnel_overall(db, filters, filter_logic, start_date, end_date) -> di
 
 
 async def _funnel_by_dimension(db, filters, filter_logic, start_date, end_date, dimension: str) -> dict:
-    clauses = _build_where_clauses(filters, filter_logic, start_date, end_date)
+    clauses, needs_join = _build_where_clauses(filters, filter_logic, start_date, end_date)
     col = getattr(Lead, dimension)
 
     stmt = (
@@ -63,6 +68,7 @@ async def _funnel_by_dimension(db, filters, filter_logic, start_date, end_date, 
         .where(col.isnot(None))
         .where(col != "")
     )
+    stmt = _apply_store_join_if_needed(stmt, needs_join)
     stmt = _apply_clauses(stmt, clauses)
     stmt = stmt.group_by(col).order_by(func.count().desc()).limit(30)
 
@@ -82,6 +88,8 @@ async def _funnel_by_dimension(db, filters, filter_logic, start_date, end_date, 
             "contact_rate": round(c / t, 4) if t else 0,
             "deal_rate": round(d / t, 4) if t else 0,
             "conversion_rate": round(d / c, 4) if c else 0,
+            "delivery_penetration": round(d / t, 4) if t else 0,
+            "contact_penetration": round(d / c, 4) if c else 0,
         })
 
     overall = await _funnel_overall(db, filters, filter_logic, start_date, end_date)

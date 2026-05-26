@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api import dashboard, export, filters, upload
+from app.api import dashboard, export, filters, store, upload
 from app.config import settings
 from app.core.exceptions import AppException
 from app.database import init_db
@@ -33,6 +33,7 @@ async def app_exception_handler(request, exc: AppException):
 
 
 app.include_router(upload.router)
+app.include_router(store.router)
 app.include_router(dashboard.router)
 app.include_router(filters.router)
 app.include_router(export.router)

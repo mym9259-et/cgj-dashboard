@@ -340,7 +340,18 @@ FILTERABLE_FIELDS = [
     "merchant_name", "payment_method", "owner_type", "product_years", "fuel_type",
     "create_method", "referrer", "residence", "occupation", "customer_type",
     "is_store_product", "is_abnormal", "no_deal_reason", "no_contact_reason",
+    # Store mapping fields
+    "lingpao_region", "store_province", "store_city", "is_lingpao", "store_manager",
 ]
+
+# Fields that require JOIN with store_mappings
+STORE_MAPPING_FIELDS = {
+    "lingpao_region": "lingpao_region",
+    "store_province": "province",
+    "store_city": "city",
+    "is_lingpao": "is_lingpao",
+    "store_manager": "store_manager",
+}
 
 # Fields that support date range filtering
 DATE_FIELDS = ["create_time", "update_time", "deal_date", "delivery_date", "refund_date"]

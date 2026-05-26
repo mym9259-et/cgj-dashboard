@@ -1,12 +1,17 @@
-import { Layout, DatePicker, Space, Select, Button, Input } from "antd";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { Layout, DatePicker, Space, Select, Button, AutoComplete, Input } from "antd";
 import { ClearOutlined, FilterOutlined } from "@ant-design/icons";
 import { useFilterStore } from "../../stores/filterStore";
 import { FILTERABLE_FIELDS, getFieldLabel } from "../../utils/fieldLabels";
+import { getDistinctValues } from "../../api/dashboard";
 import type { FilterItem } from "../../types/filter";
 import dayjs from "dayjs";
 
 const { Header } = Layout;
 const { RangePicker } = DatePicker;
+
+// Cache for distinct values per field
+const distinctCache: Record<string, string[]> = {};
 
 export default function HeaderBar() {
   const {
@@ -63,7 +68,7 @@ export default function HeaderBar() {
 
       {filters.map((f, i) => (
         <FilterChip
-          key={i}
+          key={`${f.field}-${i}`}
           index={i}
           filter={f}
           onUpdate={(idx, filter) => updateFilter(idx, filter)}
@@ -109,13 +114,61 @@ function FilterChip({
   onRemove: (idx: number) => void;
 }) {
   const isMulti = filter.operator === "in" || filter.operator === "nin";
+  const isNumericOp = ["gte", "lte"].includes(filter.operator);
 
-  const handleValueChange = (v: string | string[]) => {
-    if (isMulti) {
-      onUpdate(index, { ...filter, value: v as string[] });
-    } else {
-      onUpdate(index, { ...filter, value: v as string });
+  // Local draft state - only committed on confirm
+  const initVal = filter.value;
+  const [draftValue, setDraftValue] = useState<string | string[] | null>(
+    initVal != null ? String(initVal) : null
+  );
+  const [options, setOptions] = useState<{ value: string; label: string }[]>([]);
+  const fieldRef = useRef(filter.field);
+
+  // Sync draft when external filter changes (e.g. operator change resets value)
+  useEffect(() => {
+    const v = filter.value;
+    setDraftValue(v != null ? String(v) : null);
+  }, [filter.value]);
+
+  // Fetch distinct values when field changes
+  useEffect(() => {
+    if (filter.field !== fieldRef.current) {
+      fieldRef.current = filter.field;
+      loadOptions(filter.field);
     }
+  }, [filter.field]);
+
+  const loadOptions = async (field: string) => {
+    if (distinctCache[field]) {
+      setOptions(distinctCache[field].map((v) => ({ value: v, label: v })));
+      return;
+    }
+    try {
+      const values = await getDistinctValues([field]);
+      const fieldValues = values[field] || [];
+      distinctCache[field] = fieldValues;
+      setOptions(fieldValues.map((v) => ({ value: v, label: v })));
+    } catch {
+      setOptions([]);
+    }
+  };
+
+  // Commit draft to store (triggers dashboard refresh)
+  const commitValue = useCallback(
+    (val: string | string[] | null) => {
+      if (isMulti) {
+        onUpdate(index, { ...filter, value: (val as string[]) || [] });
+      } else {
+        onUpdate(index, { ...filter, value: val as string });
+      }
+    },
+    [index, filter, isMulti, onUpdate]
+  );
+
+  // Filter options for autocomplete based on user input
+  const filterOptions = (inputValue: string, option: { value: string; label: string } | undefined) => {
+    if (!inputValue || !option) return true;
+    return option.label.toLowerCase().includes(inputValue.toLowerCase());
   };
 
   return (
@@ -123,7 +176,12 @@ function FilterChip({
       <Select
         size="small"
         value={filter.field}
-        onChange={(v) => onUpdate(index, { ...filter, field: v, value: null })}
+        onChange={(v) => {
+          fieldRef.current = v;
+          onUpdate(index, { ...filter, field: v, value: null });
+          setDraftValue(null);
+          loadOptions(v);
+        }}
         style={{ width: 130 }}
         options={FILTERABLE_FIELDS.map((f) => ({
           label: getFieldLabel(f),
@@ -134,7 +192,10 @@ function FilterChip({
       <Select
         size="small"
         value={filter.operator}
-        onChange={(v) => onUpdate(index, { ...filter, operator: v, value: null })}
+        onChange={(v) => {
+          onUpdate(index, { ...filter, operator: v, value: null });
+          setDraftValue(null);
+        }}
         style={{ width: 90 }}
         options={[
           { label: "等于", value: "eq" },
@@ -146,23 +207,43 @@ function FilterChip({
           { label: "含有", value: "contains" },
         ]}
       />
-      {isMulti ? (
+      {isNumericOp ? (
+        <Input
+          size="small"
+          value={(draftValue as string) || ""}
+          onChange={(e) => setDraftValue(e.target.value)}
+          onPressEnter={() => commitValue(draftValue)}
+          onBlur={() => commitValue(draftValue)}
+          style={{ width: 160 }}
+          placeholder="输入数值"
+        />
+      ) : isMulti ? (
         <Select
           size="small"
           mode="tags"
-          value={Array.isArray(filter.value) ? filter.value : []}
-          onChange={(v) => handleValueChange(v)}
+          value={Array.isArray(draftValue) ? draftValue : []}
+          onChange={(v) => {
+            setDraftValue(v);
+            commitValue(v); // multi-select commits immediately on select
+          }}
           style={{ width: 160 }}
-          placeholder="输入值"
+          placeholder="输入或选择"
+          options={options}
+          showSearch
+          filterOption={filterOptions as any}
           allowClear
         />
       ) : (
-        <Input
+        <AutoComplete
           size="small"
-          value={(filter.value as string) || ""}
-          onChange={(e) => handleValueChange(e.target.value)}
+          value={(draftValue as string) || ""}
+          onChange={(v) => setDraftValue(v)}
+          onSelect={(v) => commitValue(v)}
+          onBlur={() => commitValue(draftValue)}
           style={{ width: 160 }}
-          placeholder="输入值"
+          placeholder="输入值（回车确认）"
+          options={options}
+          filterOption={filterOptions as any}
           allowClear
         />
       )}

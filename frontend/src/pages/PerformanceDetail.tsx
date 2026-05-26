@@ -8,21 +8,24 @@ import { getPerformanceDetail } from "../api/dashboard";
 import type { PerformanceDetailData } from "../types/dashboard";
 import { formatCurrency, formatPercent } from "../utils/formatters";
 import { CHART_COLORS } from "../utils/chartColors";
+import { useDebounce } from "../hooks/useDebounce";
 
 export default function PerformanceDetail() {
   const { name } = useParams<{ name: string }>();
   const navigate = useNavigate();
   const { startDate, endDate } = useFilterStore();
+  const debouncedStartDate = useDebounce(startDate, 300);
+  const debouncedEndDate = useDebounce(endDate, 300);
   const [data, setData] = useState<PerformanceDetailData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!name) return;
     setLoading(true);
-    getPerformanceDetail(decodeURIComponent(name), startDate, endDate)
+    getPerformanceDetail(decodeURIComponent(name), debouncedStartDate, debouncedEndDate)
       .then(setData)
       .finally(() => setLoading(false));
-  }, [name, startDate, endDate]);
+  }, [name, debouncedStartDate, debouncedEndDate]);
 
   if (loading) return <Spin size="large" style={{ display: "block", margin: "100px auto" }} />;
   if (!data || !data.summary) return <Empty description="暂无该销售员数据" />;
@@ -31,13 +34,18 @@ export default function PerformanceDetail() {
 
   const trendOption = {
     tooltip: { trigger: "axis" },
-    legend: { data: ["线索数", "成交数"], bottom: 0 },
-    grid: { left: 60, right: 30, top: 20, bottom: 40 },
+    legend: { data: ["线索数", "成交数", "交付渗透率", "触客渗透率"], bottom: 0 },
+    grid: { left: 60, right: 60, top: 20, bottom: 40, containLabel: true },
     xAxis: { type: "category", data: monthly_trend.map((t) => t.day), axisLabel: { rotate: 45, fontSize: 10 } },
-    yAxis: { type: "value", name: "数量" },
+    yAxis: [
+      { type: "value", name: "数量" },
+      { type: "value", name: "比率", axisLabel: { formatter: (v: number) => (v * 100).toFixed(0) + "%" } },
+    ],
     series: [
       { name: "线索数", type: "line", data: monthly_trend.map((t) => t.leads), smooth: true, itemStyle: { color: CHART_COLORS[0] } },
       { name: "成交数", type: "line", data: monthly_trend.map((t) => t.deals), smooth: true, itemStyle: { color: CHART_COLORS[1] } },
+      { name: "交付渗透率", type: "line", yAxisIndex: 1, data: monthly_trend.map((t) => t.delivery_penetration), smooth: true, itemStyle: { color: CHART_COLORS[5] } },
+      { name: "触客渗透率", type: "line", yAxisIndex: 1, data: monthly_trend.map((t) => t.contact_penetration), smooth: true, itemStyle: { color: "#faad14" } },
     ],
   };
 
@@ -64,30 +72,20 @@ export default function PerformanceDetail() {
         返回排名
       </Button>
 
-      <h2 style={{ marginBottom: 16 }}>{summary.salesperson} - 业绩详情</h2>
-
-      <Card title="个人漏斗">
-        <div style={{ display: "flex", justifyContent: "space-around", padding: "20px 0" }}>
-          <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 28, fontWeight: 600, color: CHART_COLORS[0] }}>{funnel.total_leads}</div>
-            <div style={{ color: "#8c8c8c" }}>总线索</div>
-          </div>
-          <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 28, fontWeight: 600, color: CHART_COLORS[1] }}>{funnel.contacted}</div>
-            <div style={{ color: "#8c8c8c" }}>已触客 ({formatPercent(summary.contacted_rate, 1)})</div>
-          </div>
-          <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 28, fontWeight: 600, color: CHART_COLORS[3] }}>{funnel.deals}</div>
-            <div style={{ color: "#8c8c8c" }}>已成交 ({formatPercent(summary.deal_rate, 1)})</div>
-          </div>
+      <h2 style={{ marginBottom: 8 }}>{summary.salesperson} - 业绩详情</h2>
+      {data.merchant_name && (
+        <div style={{ marginBottom: 16, color: "#8c8c8c", fontSize: 13 }}>
+          所在商户：{data.merchant_name}
         </div>
-      </Card>
+      )}
 
-      <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
-        <Col span={6}><Card><Statistic title="总线索" value={summary.total_leads} /></Card></Col>
-        <Col span={6}><Card><Statistic title="成交数" value={summary.deals} valueStyle={{ color: "#52c41a" }} /></Card></Col>
-        <Col span={6}><Card><Statistic title="销售额" value={formatCurrency(summary.revenue)} /></Card></Col>
-        <Col span={6}><Card><Statistic title="客单价" value={formatCurrency(summary.avg_deal)} /></Card></Col>
+      <Row gutter={[12, 12]}>
+        <Col span={4}><Card size="small"><Statistic title="总交付" value={summary.total_leads} /></Card></Col>
+        <Col span={4}><Card size="small"><Statistic title="成交数" value={summary.deals} valueStyle={{ color: "#52c41a" }} /></Card></Col>
+        <Col span={4}><Card size="small"><Statistic title="交付渗透率" value={summary.delivery_penetration != null ? formatPercent(summary.delivery_penetration, 1) : "-"} valueStyle={{ color: (summary.delivery_penetration ?? 0) >= 0.3 ? "#52c41a" : "#faad14" }} /></Card></Col>
+        <Col span={4}><Card size="small"><Statistic title="触客渗透率" value={summary.contact_penetration != null ? formatPercent(summary.contact_penetration, 1) : "-"} valueStyle={{ color: (summary.contact_penetration ?? 0) >= 0.4 ? "#52c41a" : "#faad14" }} /></Card></Col>
+        <Col span={4}><Card size="small"><Statistic title="触客率" value={formatPercent(summary.contacted_rate, 1)} /></Card></Col>
+        <Col span={4}><Card size="small"><Statistic title="销售额" value={formatCurrency(summary.revenue)} /></Card></Col>
       </Row>
 
       <Row gutter={[16, 16]} style={{ marginTop: 16 }}>

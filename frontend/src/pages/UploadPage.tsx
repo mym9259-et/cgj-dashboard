@@ -15,7 +15,7 @@ import {
   Steps,
   Result,
 } from "antd";
-import { InboxOutlined, CheckCircleOutlined, WarningOutlined } from "@ant-design/icons";
+import { InboxOutlined, CheckCircleOutlined, WarningOutlined, UploadOutlined } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
 import { useUploadStore } from "../stores/uploadStore";
 import {
@@ -27,6 +27,8 @@ import {
 } from "../api/upload";
 import { FIELD_LABELS } from "../utils/fieldLabels";
 import { v4 as uuidv4 } from "../utils/uuid";
+import MappingFixModal from "../components/upload/MappingFixModal";
+import apiClient from "../api/client";
 
 const { Dragger } = Upload;
 
@@ -36,6 +38,9 @@ export default function UploadPage() {
   const [showSaveMapping, setShowSaveMapping] = useState(false);
   const [mappingName, setMappingName] = useState("");
   const [importResult, setImportResult] = useState<any>(null);
+  const [showMappingFix, setShowMappingFix] = useState(false);
+  const [unmatchedStores, setUnmatchedStores] = useState<string[]>([]);
+  const [mappingCoverage, setMappingCoverage] = useState(0);
 
   useEffect(() => {
     listMappings().then(setSavedMappings).catch(() => {});
@@ -76,6 +81,8 @@ export default function UploadPage() {
       store.setStep("importing");
       const result = await importData(uploadId, store.mapping);
       setImportResult(result);
+      setUnmatchedStores(result.unmatched_stores || []);
+      setMappingCoverage(result.mapping_coverage ?? 0);
       store.setStep("done");
       message.success(
         `导入完成：${result.valid_rows} 条有效数据，${result.error_rows} 条错误`
@@ -211,6 +218,48 @@ export default function UploadPage() {
             </Button>,
           ]}
         />
+        {/* Store mapping validation */}
+        <Card size="small" title="门店映射校验" style={{ marginTop: 16 }}>
+          <p>映射覆盖率: <strong>{(mappingCoverage * 100).toFixed(0)}%</strong> ({unmatchedStores.length} 个商户未匹配)</p>
+          {unmatchedStores.length > 0 && (
+            <>
+              <Table
+                style={{ marginTop: 8 }}
+                dataSource={unmatchedStores.map((s, i) => ({ key: i, name: s }))}
+                columns={[{ title: "未匹配商户", dataIndex: "name", key: "name" }]}
+                size="small"
+                pagination={{ pageSize: 5 }}
+              />
+              <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
+                <Button onClick={() => setShowMappingFix(true)} type="primary">手动补充映射</Button>
+                <Upload accept=".xlsx,.xls" showUploadList={false}
+                  beforeUpload={async (file) => {
+                    const form = new FormData();
+                    form.append("file", file);
+                    try {
+                      await apiClient.post("/store/mapping/upload", form);
+                      message.success("映射表已更新");
+                      const r2 = await apiClient.get("/store/mapping/unmatched");
+                      setUnmatchedStores(r2.data.unmatched_merchants || []);
+                      setMappingCoverage(r2.data.coverage ?? 0);
+                    } catch (e: any) { message.error("上传失败: " + (e?.response?.data?.detail || e.message)); }
+                    return false;
+                  }}>
+                  <Button icon={<UploadOutlined />}>上传映射表</Button>
+                </Upload>
+              </div>
+            </>
+          )}
+        </Card>
+
+        <MappingFixModal open={showMappingFix} stores={unmatchedStores}
+          onClose={async () => {
+            setShowMappingFix(false);
+            const r2 = await apiClient.get("/store/mapping/unmatched");
+            setUnmatchedStores(r2.data.unmatched_merchants || []);
+            setMappingCoverage(r2.data.coverage ?? 0);
+          }} />
+
         {importResult.errors?.length > 0 && (
           <Table
             style={{ marginTop: 16 }}

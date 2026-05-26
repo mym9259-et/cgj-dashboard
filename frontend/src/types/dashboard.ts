@@ -9,6 +9,9 @@ export interface KpiData {
   refund_count: number;
   refund_rate: number;
   refund_amount: number;
+  delivery_penetration: number;
+  contact_penetration: number;
+  contact_rate: number;
 }
 
 export interface TrendItem {
@@ -18,6 +21,11 @@ export interface TrendItem {
   deals: number;
   revenue: number;
   refunds: number;
+  delivery_penetration: number;
+  contact_penetration: number;
+  contact_rate: number;
+  delivery_penetration_ma7: number;
+  contact_penetration_ma7: number;
 }
 
 export interface DashboardOverview {
@@ -41,6 +49,8 @@ export interface FunnelBreakdownItem {
   contact_rate: number;
   deal_rate: number;
   conversion_rate: number;
+  delivery_penetration: number;
+  contact_penetration: number;
 }
 
 export interface FunnelData {
@@ -86,6 +96,9 @@ export interface RankingItem {
   revenue: number;
   avg_deal: number;
   contacted_rate: number;
+  delivery_penetration: number;
+  contact_penetration: number;
+  merchant_name: string;
   refunds: number;
   rank: number;
 }
@@ -98,6 +111,7 @@ export interface PerformanceRanking {
 export interface PerformanceDetailData {
   salesperson: string;
   summary: RankingItem | null;
+  merchant_name: string;
   monthly_trend: TrendItem[];
   by_product: ProductDistItem[];
   by_model: ProductDistItem[];

@@ -6,6 +6,7 @@ import {
   FunnelPlotOutlined,
   PieChartOutlined,
   TeamOutlined,
+  SwapOutlined,
 } from "@ant-design/icons";
 
 const menuItems = [
@@ -14,6 +15,7 @@ const menuItems = [
   { key: "/funnel", icon: <FunnelPlotOutlined />, label: "转化漏斗" },
   { key: "/orders", icon: <PieChartOutlined />, label: "订单结构" },
   { key: "/performance", icon: <TeamOutlined />, label: "人员业绩" },
+  { key: "/compare", icon: <SwapOutlined />, label: "对比看板" },
 ];
 
 export default function SideMenu() {

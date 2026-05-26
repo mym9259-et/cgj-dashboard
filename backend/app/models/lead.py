@@ -14,74 +14,74 @@ class Lead(Base):
     batch_id: Mapped[str] = mapped_column(String(36), nullable=False)
 
     # Identifier
-    source_id: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    source_id: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
     # Merchant & Source
-    merchant_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
-    customer_source: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    merchant_name: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    customer_source: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
     # Customer
-    customer_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    customer_phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
-    gender: Mapped[str | None] = mapped_column(String(10), nullable=True)
-    age_group: Mapped[str | None] = mapped_column(String(30), nullable=True)
-    residence: Mapped[str | None] = mapped_column(String(200), nullable=True)
-    occupation: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    customer_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    customer_phone: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    gender: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    age_group: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    residence: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    occupation: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
     # Vehicle
-    brand: Mapped[str | None] = mapped_column(String(50), nullable=True)
-    model_series: Mapped[str | None] = mapped_column(String(50), nullable=True)
-    vin: Mapped[str | None] = mapped_column(String(50), nullable=True)
-    fuel_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
-    payment_method: Mapped[str | None] = mapped_column(String(30), nullable=True)
-    owner_type: Mapped[str | None] = mapped_column(String(30), nullable=True)
-    usage_scenario: Mapped[str | None] = mapped_column(String(200), nullable=True)
-    customer_type: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    brand: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    model_series: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    vin: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    fuel_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    payment_method: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    owner_type: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    usage_scenario: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    customer_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
     # Sales Process
-    salesperson: Mapped[str | None] = mapped_column(String(50), nullable=True)
-    referrer: Mapped[str | None] = mapped_column(String(50), nullable=True)
-    create_method: Mapped[str | None] = mapped_column(String(50), nullable=True)
-    creator_nick: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    salesperson: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    referrer: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    create_method: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    creator_nick: Mapped[str | None] = mapped_column(String(200), nullable=True)
     create_time: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     update_time: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    contact_status: Mapped[str | None] = mapped_column(String(20), nullable=True)
-    no_contact_reason: Mapped[str | None] = mapped_column(String(200), nullable=True)
-    no_contact_note: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    contact_status: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    no_contact_reason: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    no_contact_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     delivery_date: Mapped[date | None] = mapped_column(Date, nullable=True)
 
     # Product
-    product_source: Mapped[str | None] = mapped_column(String(30), nullable=True)
-    product_type: Mapped[str | None] = mapped_column(String(30), nullable=True)
-    product_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
-    product_years: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    product_source: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    product_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    product_name: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    product_years: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
     # Deal Result
-    deal_status: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    deal_status: Mapped[str | None] = mapped_column(String(100), nullable=True)
     deal_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     deal_amount: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)
 
     # No-deal
-    no_deal_reason: Mapped[str | None] = mapped_column(String(200), nullable=True)
-    no_deal_note: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    no_deal_reason: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    no_deal_note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Refund
     refund_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     refund_amount: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)
 
     # Referral Bonus
-    referral_bonus_status: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    referral_bonus_status: Mapped[str | None] = mapped_column(String(100), nullable=True)
     referral_bonus_amount: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)
     referral_bonus: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)
 
     # Gifts
-    is_gifted: Mapped[str | None] = mapped_column(String(5), nullable=True)
-    gift_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    is_gifted: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    gift_name: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     # Flags
-    is_abnormal: Mapped[str | None] = mapped_column(String(5), nullable=True)
-    abnormal_info: Mapped[str | None] = mapped_column(String(500), nullable=True)
-    is_store_product: Mapped[str | None] = mapped_column(String(5), nullable=True)
+    is_abnormal: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    abnormal_info: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_store_product: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
     # Attachments
     order_screenshot: Mapped[str | None] = mapped_column(Text, nullable=True)
