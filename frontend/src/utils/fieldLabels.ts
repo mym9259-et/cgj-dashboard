@@ -63,6 +63,7 @@ export const FILTERABLE_FIELDS = [
   "create_method", "referrer", "residence", "occupation", "customer_type",
   "is_store_product", "is_abnormal",
   "lingpao_region", "store_province", "store_city", "is_lingpao", "store_manager",
+  "dealer_direct", "store_mode",
 ];
 
 // Additional labels for store mapping fields
@@ -72,6 +73,8 @@ export const EXTRA_LABELS: Record<string, string> = {
   store_city: "市",
   is_lingpao: "是否零跑",
   store_manager: "门店总经理",
+  dealer_direct: "经销商/直营",
+  store_mode: "模式",
 };
 
 export const FIELD_OPERATORS: Record<string, string[]> = {

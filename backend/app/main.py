@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api import dashboard, export, filters, store, upload
+from app.api import car_series, dashboard, export, filters, store, upload
 from app.config import settings
 from app.core.exceptions import AppException
 from app.database import init_db
@@ -16,7 +16,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="车管家数据看板 API", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="车管家数据看板API", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -36,6 +36,7 @@ app.include_router(upload.router)
 app.include_router(store.router)
 app.include_router(dashboard.router)
 app.include_router(filters.router)
+app.include_router(car_series.router)
 app.include_router(export.router)
 
 

@@ -6,6 +6,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.lead import Lead
+from app.core.constants import DEAL_STATUS_SUCCESS
 from app.services.dashboard_service import (
     _build_where_clauses, _apply_clauses, _apply_store_join_if_needed,
 )
@@ -22,7 +23,7 @@ async def get_order_structure(
     clauses, needs_join = _build_where_clauses(filters, filter_logic, start_date, end_date)
 
     # Product distribution (deals only)
-    deal_clauses = clauses + [Lead.deal_status == "已成交"]
+    deal_clauses = clauses + [Lead.deal_status == DEAL_STATUS_SUCCESS]
     by_type = await _group_count(db, deal_clauses, needs_join, "product_type")
     by_source = await _group_count(db, deal_clauses, needs_join, "product_source")
     by_years = await _group_count(db, deal_clauses, needs_join, "product_years")

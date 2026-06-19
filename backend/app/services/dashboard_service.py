@@ -1,14 +1,35 @@
 """Dashboard KPI calculation, trend data, and filter-based query builder."""
 
-from datetime import date, datetime
+from datetime import date
 
 from sqlalchemy import and_, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import Select
 
-from app.core.constants import STORE_MAPPING_FIELDS
+from app.core.constants import CONTACT_STATUS_REACHED, DEAL_STATUS_SUCCESS, STORE_MAPPING_FIELDS
+from app.models.car_series_mapping import CarSeriesMapping
 from app.models.lead import Lead
 from app.models.store_mapping import StoreMapping
+
+
+SERIES_GROUPS = {
+    "a_series": ("A10",),
+    "b_series": ("B01", "B10"),
+    "c_series": ("C01", "C10", "C11", "C16"),
+    "d_series": ("D19",),
+    "lafa_series": ("Lafa 5",),
+    "other_series": ("T03", "其他"),
+}
+TREND_SERIES_GROUPS = {
+    key: value for key, value in SERIES_GROUPS.items() if key != "other_series"
+}
+
+
+def _series_group_condition(clean_series: tuple[str, ...]):
+    mapped_raw_series = select(CarSeriesMapping.raw_series).where(
+        CarSeriesMapping.clean_series.in_(clean_series)
+    )
+    return Lead.model_series.in_(mapped_raw_series)
 
 
 def _needs_store_join(filters: list[dict] | None) -> bool:
@@ -106,11 +127,9 @@ def _build_where_clauses(
     needs_join = _needs_store_join(filters)
 
     if start_date:
-        start_dt = datetime.combine(start_date, datetime.min.time())
-        clauses.append(Lead.create_time >= start_dt)
+        clauses.append(Lead.delivery_date >= start_date)
     if end_date:
-        end_dt = datetime.combine(end_date, datetime.max.time())
-        clauses.append(Lead.create_time <= end_dt)
+        clauses.append(Lead.delivery_date <= end_date)
 
     filter_cond = build_filter_conditions(filters or [], filter_logic)
     if filter_cond is not None:
@@ -184,10 +203,50 @@ async def get_kpi_data(
     refund_amount = await db.scalar(_sum(Lead.refund_amount, clauses + [Lead.deal_status == "已退款"], needs_join)) or 0
     refund_amount = float(refund_amount)
 
+    five_year_deals = await db.scalar(_count(clauses, needs_join, [Lead.deal_status == DEAL_STATUS_SUCCESS, Lead.product_years.in_(["5"])])) or 0
+    five_year_ratio = round(five_year_deals / deals, 4) if deals > 0 else 0.0
+
+    wuyou_deals = await db.scalar(_count(clauses, needs_join, [Lead.deal_status == DEAL_STATUS_SUCCESS, Lead.product_type == "无忧产品"])) or 0
+    wuyou_five_year_deals = await db.scalar(_count(clauses, needs_join, [Lead.deal_status == DEAL_STATUS_SUCCESS, Lead.product_type == "无忧产品", Lead.product_years.in_(["5"])])) or 0
+    wuyou_five_year_ratio = round(wuyou_five_year_deals / wuyou_deals, 4) if wuyou_deals > 0 else 0.0
+
+    series_columns = []
+    for key, clean_series in SERIES_GROUPS.items():
+        group_condition = _series_group_condition(clean_series)
+        series_columns.extend([
+            func.count().filter(group_condition).label(f"{key}_count"),
+            func.count().filter(
+                group_condition,
+                Lead.contact_status == CONTACT_STATUS_REACHED,
+            ).label(f"{key}_contacted"),
+            func.count().filter(
+                group_condition,
+                Lead.deal_status == DEAL_STATUS_SUCCESS,
+            ).label(f"{key}_deals"),
+        ])
+
+    series_stmt = select(*series_columns).select_from(Lead)
+    series_stmt = _apply_store_join_if_needed(series_stmt, needs_join)
+    series_stmt = _apply_clauses(series_stmt, clauses)
+    series_row = (await db.execute(series_stmt)).one()
+
+    series_metrics = {}
+    for key in SERIES_GROUPS:
+        count = getattr(series_row, f"{key}_count") or 0
+        series_contacted = getattr(series_row, f"{key}_contacted") or 0
+        series_deals = getattr(series_row, f"{key}_deals") or 0
+        series_metrics[key] = {
+            "count": count,
+            "ratio": round(count / total, 4) if total > 0 else 0.0,
+            "contact_penetration": round(series_deals / series_contacted, 4)
+            if series_contacted > 0 else 0.0,
+        }
+
     # New metrics
     delivery_penetration = round(deals / total, 4) if total > 0 else 0.0
     contact_penetration = round(deals / contacted, 4) if contacted > 0 else 0.0
     contact_rate = round(contacted / total, 4) if total > 0 else 0.0
+    completed_orders = deals + refunds
 
     return {
         "total_leads": total,
@@ -198,11 +257,20 @@ async def get_kpi_data(
         "contacted_count": contacted,
         "contacted_rate": round(contacted / total, 4) if total > 0 else 0.0,
         "refund_count": refunds,
-        "refund_rate": round(refunds / total, 4) if total > 0 else 0.0,
+        "refund_rate": round(refunds / completed_orders, 4) if completed_orders > 0 else 0.0,
         "refund_amount": round(refund_amount, 2),
         "delivery_penetration": delivery_penetration,
         "contact_penetration": contact_penetration,
         "contact_rate": contact_rate,
+        "five_year_deals": five_year_deals,
+        "five_year_ratio": five_year_ratio,
+        "wuyou_five_year_ratio": wuyou_five_year_ratio,
+        **{f"{key}_count": metrics["count"] for key, metrics in series_metrics.items()},
+        **{f"{key}_ratio": metrics["ratio"] for key, metrics in series_metrics.items()},
+        **{
+            f"{key}_contact_penetration": metrics["contact_penetration"]
+            for key, metrics in series_metrics.items()
+        },
     }
 
 
@@ -222,17 +290,44 @@ async def get_trend_data(
     clauses, needs_join = _build_where_clauses(filters, filter_logic, start_date, end_date)
 
     stmt = select(
-        func.date(Lead.create_time).label("day"),
+        func.date(Lead.delivery_date).label("day"),
         func.count().label("leads"),
         func.count().filter(Lead.contact_status == "已触客").label("contacted"),
         func.count().filter(Lead.deal_status == "已成交").label("deals"),
         func.coalesce(func.sum(Lead.deal_amount).filter(Lead.deal_status == "已成交"), 0).label("revenue"),
         func.count().filter(Lead.deal_status == "已退款").label("refunds"),
+        *[
+            func.count().filter(_series_group_condition(clean_series)).label(f"{key}_count")
+            for key, clean_series in TREND_SERIES_GROUPS.items()
+        ],
+        *[
+            func.count().filter(
+                _series_group_condition(clean_series),
+                Lead.contact_status == CONTACT_STATUS_REACHED,
+            ).label(f"{key}_contacted")
+            for key, clean_series in TREND_SERIES_GROUPS.items()
+        ],
+        *[
+            func.count().filter(
+                _series_group_condition(clean_series),
+                Lead.deal_status == DEAL_STATUS_SUCCESS,
+            ).label(f"{key}_deals")
+            for key, clean_series in TREND_SERIES_GROUPS.items()
+        ],
+        func.count().filter(
+            Lead.deal_status == DEAL_STATUS_SUCCESS,
+            Lead.product_type == "无忧产品",
+        ).label("wuyou_deals"),
+        func.count().filter(
+            Lead.deal_status == DEAL_STATUS_SUCCESS,
+            Lead.product_type == "无忧产品",
+            Lead.product_years.in_(["5"]),
+        ).label("wuyou_five_year_deals"),
     ).select_from(Lead)
 
     stmt = _apply_store_join_if_needed(stmt, needs_join)
     stmt = _apply_clauses(stmt, clauses)
-    stmt = stmt.where(Lead.create_time.isnot(None))
+    stmt = stmt.where(Lead.delivery_date.isnot(None))
     stmt = stmt.group_by(text("day")).order_by(text("day"))
 
     result = await db.execute(stmt)
@@ -244,6 +339,7 @@ async def get_trend_data(
         t = row.leads or 0
         c = row.contacted or 0
         d = row.deals or 0
+        wuyou_deals = row.wuyou_deals or 0
         daily.append({
             "day": str(row.day),
             "leads": t,
@@ -254,6 +350,22 @@ async def get_trend_data(
             "delivery_penetration": round(d / t, 4) if t > 0 else 0.0,
             "contact_penetration": round(d / c, 4) if c > 0 else 0.0,
             "contact_rate": round(c / t, 4) if t > 0 else 0.0,
+            **{f"{key}_count": getattr(row, f"{key}_count") or 0 for key in TREND_SERIES_GROUPS},
+            **{f"{key}_contacted": getattr(row, f"{key}_contacted") or 0 for key in TREND_SERIES_GROUPS},
+            **{f"{key}_deals": getattr(row, f"{key}_deals") or 0 for key in TREND_SERIES_GROUPS},
+            **{
+                f"{key}_ratio": round((getattr(row, f"{key}_count") or 0) / t, 4) if t > 0 else 0.0
+                for key in TREND_SERIES_GROUPS
+            },
+            **{
+                f"{key}_contact_penetration": round(
+                    (getattr(row, f"{key}_deals") or 0) /
+                    (getattr(row, f"{key}_contacted") or 0),
+                    4,
+                ) if (getattr(row, f"{key}_contacted") or 0) > 0 else 0.0
+                for key in TREND_SERIES_GROUPS
+            },
+            "wuyou_five_year_ratio": round((row.wuyou_five_year_deals or 0) / wuyou_deals, 4) if wuyou_deals > 0 else 0.0,
         })
 
     # Calculate MA7 (7-day moving average of the ratio, not average of individual daily ratios)
@@ -274,6 +386,27 @@ async def get_trend_data(
             item["contact_penetration_ma7"] = round(sum_deals / sum_contacted, 4)
         else:
             item["contact_penetration_ma7"] = 0.0
+
+        window20 = daily[max(0, i - 19) : i + 1]
+        sum_leads20 = sum(d["leads"] for d in window20)
+        for key in TREND_SERIES_GROUPS:
+            series_count20 = sum(d[f"{key}_count"] for d in window20)
+            item[f"{key}_ratio_ma20"] = (
+                round(series_count20 / sum_leads20, 4) if sum_leads20 > 0 else 0.0
+            )
+
+            series_contacted7 = sum(d[f"{key}_contacted"] for d in window)
+            series_deals7 = sum(d[f"{key}_deals"] for d in window)
+            item[f"{key}_contact_penetration_ma7"] = (
+                round(series_deals7 / series_contacted7, 4)
+                if series_contacted7 > 0 else 0.0
+            )
+
+    for item in daily:
+        for key in TREND_SERIES_GROUPS:
+            item.pop(f"{key}_count", None)
+            item.pop(f"{key}_contacted", None)
+            item.pop(f"{key}_deals", None)
 
     return daily
 

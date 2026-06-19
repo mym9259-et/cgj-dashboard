@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+﻿import { Routes, Route, Navigate } from "react-router-dom";
 import AppLayout from "./components/layout/AppLayout";
 import UploadPage from "./pages/UploadPage";
 import DashboardPage from "./pages/DashboardPage";
@@ -7,6 +7,8 @@ import OrdersPage from "./pages/OrdersPage";
 import PerformancePage from "./pages/PerformancePage";
 import PerformanceDetail from "./pages/PerformanceDetail";
 import ComparePage from "./pages/ComparePage";
+import TrendComparePage from "./pages/TrendComparePage";
+import MappingPage from "./pages/MappingPage";
 
 export default function App() {
   return (
@@ -20,6 +22,8 @@ export default function App() {
         <Route path="/performance" element={<PerformancePage />} />
         <Route path="/performance/:name" element={<PerformanceDetail />} />
         <Route path="/compare" element={<ComparePage />} />
+        <Route path="/compare/trend" element={<TrendComparePage />} />
+        <Route path="/mapping" element={<MappingPage />} />
       </Routes>
     </AppLayout>
   );

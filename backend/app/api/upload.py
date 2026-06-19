@@ -18,7 +18,7 @@ from app.schemas.upload import (
     PreviewResponse,
     UploadHistoryItem,
 )
-from app.services.import_service import import_from_excel, preview_excel, truncate_leads
+from app.services.import_service import import_from_excel, preview_excel
 from app.services.store_mapping_service import get_unmatched_merchants
 from app.services.upload_service import get_assembly_progress, save_chunk
 
@@ -74,9 +74,9 @@ async def upload_import(
     logger.info(f"Mapping values: {list(req.mapping.values())[:5]}...")
 
     try:
-        # Truncate existing data first
-        await truncate_leads(db)
-
+        # import_from_excel now performs truncate + bulk insert + batch
+        # status update in a single atomic transaction.  On failure the
+        # previous leads dataset is preserved.
         result = await import_from_excel(db, req.upload_id, req.mapping)
         logger.info(f"Import success: {result['total_rows']} rows")
 

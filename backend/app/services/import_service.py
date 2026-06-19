@@ -1,10 +1,10 @@
-"""Core import pipeline: parse Excel, validate, truncate, bulk insert."""
+"""Core import pipeline: atomically replace leads with an uploaded dataset."""
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
-from sqlalchemy import delete, select, text
+from sqlalchemy import delete, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -69,6 +69,10 @@ async def import_from_excel(
     await db.commit()
 
     try:
+        # Keep the delete and every insert in one transaction. Readers continue
+        # seeing the previous dataset until the replacement commits.
+        await db.execute(delete(Lead))
+
         # Stream parse and import
         total_rows = 0
         valid_rows = 0
@@ -96,21 +100,21 @@ async def import_from_excel(
             if valid_batch:
                 await _bulk_insert_leads(db, batch_id, valid_batch)
 
+        if valid_rows == 0:
+            raise ValueError("上传文件没有可导入的有效数据，已保留原有数据")
+
         # Update batch record
         batch.row_count = total_rows
         batch.valid_count = valid_rows
         batch.error_count = error_rows
         batch.status = "completed"
-        batch.completed_at = datetime.utcnow()
+        batch.completed_at = datetime.now(timezone.utc)
         if all_errors:
             batch.error_log = {"errors": all_errors[:1000]}  # Cap error log size
         await db.commit()
 
         # Refresh materialized view if it exists
         await _refresh_materialized_view(db)
-
-        # Cleanup temp files
-        cleanup_upload(upload_id)
 
         return {
             "batch_id": str(batch_id),
@@ -121,10 +125,18 @@ async def import_from_excel(
         }
 
     except Exception as e:
-        batch.status = "failed"
-        batch.error_log = {"message": str(e)}
+        # Roll back both the delete and any new rows already flushed, preserving
+        # the previously active full dataset.
+        await db.rollback()
+        await db.execute(
+            update(UploadBatch)
+            .where(UploadBatch.id == batch_id)
+            .values(status="failed", error_log={"message": str(e)})
+        )
         await db.commit()
         raise
+    finally:
+        cleanup_upload(upload_id)
 
 
 async def _bulk_insert_leads(db: AsyncSession, batch_id: str, rows: list[dict]):
@@ -254,7 +266,7 @@ async def _bulk_insert_leads(db: AsyncSession, batch_id: str, rows: list[dict]):
             extra_fields=item.get("extra_fields"),
         ))
     db.add_all(leads)
-    await db.commit()
+    await db.flush()
 
 
 async def truncate_leads(db: AsyncSession):
@@ -269,7 +281,7 @@ async def _refresh_materialized_view(db: AsyncSession):
         await db.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY mv_daily_summary"))
         await db.commit()
     except Exception:
-        pass  # View may not exist yet
+        await db.rollback()  # View may not exist yet
 
 
 # Helper converters

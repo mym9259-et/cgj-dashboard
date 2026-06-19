@@ -35,6 +35,27 @@ class KpiResponse(BaseModel):
     delivery_penetration: float = 0.0
     contact_penetration: float = 0.0
     contact_rate: float = 0.0
+    five_year_deals: int = 0
+    five_year_ratio: float = 0.0
+    wuyou_five_year_ratio: float = 0.0
+    a_series_count: int = 0
+    a_series_ratio: float = 0.0
+    a_series_contact_penetration: float = 0.0
+    b_series_count: int = 0
+    b_series_ratio: float = 0.0
+    b_series_contact_penetration: float = 0.0
+    c_series_count: int = 0
+    c_series_ratio: float = 0.0
+    c_series_contact_penetration: float = 0.0
+    d_series_count: int = 0
+    d_series_ratio: float = 0.0
+    d_series_contact_penetration: float = 0.0
+    lafa_series_count: int = 0
+    lafa_series_ratio: float = 0.0
+    lafa_series_contact_penetration: float = 0.0
+    other_series_count: int = 0
+    other_series_ratio: float = 0.0
+    other_series_contact_penetration: float = 0.0
 
 
 class TrendItem(BaseModel):
@@ -49,6 +70,27 @@ class TrendItem(BaseModel):
     contact_rate: float = 0.0
     delivery_penetration_ma7: float = 0.0
     contact_penetration_ma7: float = 0.0
+    a_series_ratio: float = 0.0
+    a_series_ratio_ma20: float = 0.0
+    a_series_contact_penetration: float = 0.0
+    a_series_contact_penetration_ma7: float = 0.0
+    b_series_ratio: float = 0.0
+    b_series_ratio_ma20: float = 0.0
+    b_series_contact_penetration: float = 0.0
+    b_series_contact_penetration_ma7: float = 0.0
+    c_series_ratio: float = 0.0
+    c_series_ratio_ma20: float = 0.0
+    c_series_contact_penetration: float = 0.0
+    c_series_contact_penetration_ma7: float = 0.0
+    d_series_ratio: float = 0.0
+    d_series_ratio_ma20: float = 0.0
+    d_series_contact_penetration: float = 0.0
+    d_series_contact_penetration_ma7: float = 0.0
+    lafa_series_ratio: float = 0.0
+    lafa_series_ratio_ma20: float = 0.0
+    lafa_series_contact_penetration: float = 0.0
+    lafa_series_contact_penetration_ma7: float = 0.0
+    wuyou_five_year_ratio: float = 0.0
 
 
 class DashboardOverview(BaseModel):

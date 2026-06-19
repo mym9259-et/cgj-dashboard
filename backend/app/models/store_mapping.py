@@ -16,5 +16,7 @@ class StoreMapping(Base):
     city: Mapped[str | None] = mapped_column(String(100), nullable=True)
     is_lingpao: Mapped[str | None] = mapped_column(String(20), nullable=True)
     store_manager: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    dealer_direct: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    store_mode: Mapped[str | None] = mapped_column(String(100), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())

@@ -342,6 +342,7 @@ FILTERABLE_FIELDS = [
     "is_store_product", "is_abnormal", "no_deal_reason", "no_contact_reason",
     # Store mapping fields
     "lingpao_region", "store_province", "store_city", "is_lingpao", "store_manager",
+    "dealer_direct", "store_mode",
 ]
 
 # Fields that require JOIN with store_mappings
@@ -351,6 +352,8 @@ STORE_MAPPING_FIELDS = {
     "store_city": "city",
     "is_lingpao": "is_lingpao",
     "store_manager": "store_manager",
+    "dealer_direct": "dealer_direct",
+    "store_mode": "store_mode",
 }
 
 # Fields that support date range filtering
@@ -362,6 +365,26 @@ NUMERIC_FIELDS = ["deal_amount", "refund_amount", "referral_bonus", "referral_bo
 # Fields that are considered "soft-required" — importable without them but reduced functionality
 SOFT_REQUIRED_FIELDS = ["deal_status", "create_time"]
 
+
+# ---------------------------------------------------------------------------
+# Canonical business status strings.
+#
+# These are the only authoritative spellings of business status values.
+# Importing code MUST use these constants instead of hard-coding the
+# string literal.  This prevents silent filter/funnel breakdowns when
+# upstream data drifts to a near-duplicate (e.g. "成交" vs "已成交").
+# ---------------------------------------------------------------------------
+DEAL_STATUS_SUCCESS: str = "已成交"
+DEAL_STATUS_REFUNDED: str = "已退款"
+DEAL_STATUS_ALL: tuple[str, ...] = (DEAL_STATUS_SUCCESS, DEAL_STATUS_REFUNDED)
+
+CONTACT_STATUS_REACHED: str = "已触客"
+
+FUNNEL_TOTAL_LEADS: str = "全部线索"
+FUNNEL_CONTACTED: str = CONTACT_STATUS_REACHED
+FUNNEL_DEAL: str = DEAL_STATUS_SUCCESS
+
+COMPARE_TOTAL_LABEL: str = "总计"
 
 def get_field_label(field_name: str) -> str:
     """Get the Chinese display label for a standard field."""

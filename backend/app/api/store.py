@@ -56,15 +56,31 @@ async def all_mappings(db: AsyncSession = Depends(get_db)):
 
 @router.post("/mapping/seed")
 async def seed_default_mapping(db: AsyncSession = Depends(get_db)):
-    """Seed store mappings from the pre-packaged Excel file (for one-click setup)."""
-    seed_path = Path(settings.upload_dir).parent.parent / "门店清单_填充完成.xlsx"
-    # Also try relative to cgj-dashboard root
-    alt_path = Path(__file__).parent.parent.parent.parent.parent / "门店清单_填充完成.xlsx"
-    alt_path2 = Path(settings.upload_dir).parent / "门店清单_填充完成.xlsx"
+    """Seed store mappings from a pre-packaged Excel file.
 
-    for p in [seed_path, alt_path, alt_path2]:
+    Looks for the file (in order):
+      1. CGJ_SEED_MAPPING_FILE env var (absolute path)
+      2. <repo>/门店清单_填充完成.xlsx  (relative to this file)
+      3. <upload_dir>/../门店清单_填充完成.xlsx
+"""
+    import os
+
+    seed_filename = "门店清单_填充完成.xlsx"
+    candidates = []
+    env_path = os.environ.get("CGJ_SEED_MAPPING_FILE")
+    if env_path:
+        candidates.append(Path(env_path))
+    repo_root = Path(__file__).resolve().parent.parent.parent
+    candidates.append(repo_root / seed_filename)
+    candidates.append(repo_root / "data" / seed_filename)
+    candidates.append(Path(settings.upload_dir).parent / seed_filename)
+
+    for p in candidates:
         if p.exists():
             result = await seed_from_excel(db, str(p))
             return {**result, "source": str(p)}
 
-    raise HTTPException(404, "找不到预置的门店清单文件，请通过 POST /api/store/mapping/upload 上传")
+    raise HTTPException(
+        404,
+        "未找到预置的门店清单文件，请通过 POST /api/store/mapping/upload 上传",
+    )

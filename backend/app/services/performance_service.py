@@ -171,17 +171,17 @@ async def get_performance_detail(
     # Monthly trend
     trend_stmt = (
         select(
-            func.date(Lead.create_time).label("day"),
+            func.date(Lead.delivery_date).label("day"),
             func.count().label("leads"),
             func.count().filter(Lead.contact_status == "已触客").label("contacted"),
             func.count().filter(Lead.deal_status == "已成交").label("deals"),
             func.coalesce(func.sum(Lead.deal_amount).filter(Lead.deal_status == "已成交"), 0).label("revenue"),
         )
         .select_from(Lead)
-        .where(Lead.create_time.isnot(None))
+        .where(Lead.delivery_date.isnot(None))
     )
     trend_stmt = _apply_clauses(trend_stmt, clauses)
-    trend_stmt = trend_stmt.group_by(func.date(Lead.create_time)).order_by(func.date(Lead.create_time))
+    trend_stmt = trend_stmt.group_by(func.date(Lead.delivery_date)).order_by(func.date(Lead.delivery_date))
 
     trend_result = await db.execute(trend_stmt)
     monthly_trend = []

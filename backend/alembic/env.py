@@ -8,7 +8,7 @@ from app.config import settings
 from app.database import Base
 
 # Import all models to register them with Base
-from app.models import UploadBatch, Lead, FieldMapping, FilterPreset  # noqa: F401
+from app.models import CarSeriesMapping, UploadBatch, Lead, FieldMapping, FilterPreset  # noqa: F401
 
 config = context.config
 if config.config_file_name is not None:

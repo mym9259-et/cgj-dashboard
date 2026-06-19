@@ -35,6 +35,8 @@ async def seed_from_excel(db: AsyncSession, filepath: str) -> dict:
                     city=_str_or_none(row.get("city")),
                     is_lingpao=_str_or_none(row.get("is_lingpao")),
                     store_manager=_str_or_none(row.get("store_manager")),
+                    dealer_direct=_str_or_none(row.get("dealer_direct")),
+                    store_mode=_str_or_none(row.get("store_mode")),
                 )
                 db.add(mapping)
                 inserted += 1
@@ -58,6 +60,10 @@ def _build_field_map(excel_columns: list[str]) -> dict[str, str]:
             mapping[col] = "is_lingpao"
         elif "总经理" in col or "门店总经理" in col:
             mapping[col] = "store_manager"
+        elif "经销商" in col and "直营" in col:
+            mapping[col] = "dealer_direct"
+        elif col.strip() == "模式":
+            mapping[col] = "store_mode"
     return mapping
 
 
@@ -104,6 +110,8 @@ async def upsert_mapping(db: AsyncSession, data: dict) -> dict:
         existing.city = data.get("city", existing.city)
         existing.is_lingpao = data.get("is_lingpao", existing.is_lingpao)
         existing.store_manager = data.get("store_manager", existing.store_manager)
+        existing.dealer_direct = data.get("dealer_direct", existing.dealer_direct)
+        existing.store_mode = data.get("store_mode", existing.store_mode)
     else:
         mapping = StoreMapping(
             merchant_name=data["merchant_name"],
@@ -112,6 +120,8 @@ async def upsert_mapping(db: AsyncSession, data: dict) -> dict:
             city=data.get("city"),
             is_lingpao=data.get("is_lingpao"),
             store_manager=data.get("store_manager"),
+            dealer_direct=data.get("dealer_direct"),
+            store_mode=data.get("store_mode"),
         )
         db.add(mapping)
 
@@ -137,6 +147,8 @@ def _row_to_dict(row: StoreMapping) -> dict:
         "city": row.city,
         "is_lingpao": row.is_lingpao,
         "store_manager": row.store_manager,
+        "dealer_direct": row.dealer_direct,
+        "store_mode": row.store_mode,
     }
 
 

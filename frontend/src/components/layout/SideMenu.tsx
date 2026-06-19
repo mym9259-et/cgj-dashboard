@@ -1,21 +1,24 @@
-import { useLocation, useNavigate } from "react-router-dom";
+﻿import { useLocation, useNavigate } from "react-router-dom";
 import { Menu } from "antd";
 import {
   UploadOutlined,
   DashboardOutlined,
   FunnelPlotOutlined,
+  AuditOutlined,
   PieChartOutlined,
   TeamOutlined,
   SwapOutlined,
 } from "@ant-design/icons";
 
 const menuItems = [
+  { key: "/mapping", icon: <AuditOutlined />, label: "映射管理" },
   { key: "/upload", icon: <UploadOutlined />, label: "数据上传" },
   { key: "/dashboard", icon: <DashboardOutlined />, label: "概览看板" },
   { key: "/funnel", icon: <FunnelPlotOutlined />, label: "转化漏斗" },
   { key: "/orders", icon: <PieChartOutlined />, label: "订单结构" },
   { key: "/performance", icon: <TeamOutlined />, label: "人员业绩" },
   { key: "/compare", icon: <SwapOutlined />, label: "对比看板" },
+  { key: "/compare/trend", icon: <SwapOutlined />, label: "趋势对比" },
 ];
 
 export default function SideMenu() {

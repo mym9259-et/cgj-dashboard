@@ -12,6 +12,26 @@ export interface KpiData {
   delivery_penetration: number;
   contact_penetration: number;
   contact_rate: number;
+  five_year_ratio: number;
+  wuyou_five_year_ratio: number;
+  a_series_count: number;
+  a_series_ratio: number;
+  a_series_contact_penetration: number;
+  b_series_count: number;
+  b_series_ratio: number;
+  b_series_contact_penetration: number;
+  c_series_count: number;
+  c_series_ratio: number;
+  c_series_contact_penetration: number;
+  d_series_count: number;
+  d_series_ratio: number;
+  d_series_contact_penetration: number;
+  lafa_series_count: number;
+  lafa_series_ratio: number;
+  lafa_series_contact_penetration: number;
+  other_series_count: number;
+  other_series_ratio: number;
+  other_series_contact_penetration: number;
 }
 
 export interface TrendItem {
@@ -26,6 +46,27 @@ export interface TrendItem {
   contact_rate: number;
   delivery_penetration_ma7: number;
   contact_penetration_ma7: number;
+  a_series_ratio: number;
+  a_series_ratio_ma20: number;
+  a_series_contact_penetration: number;
+  a_series_contact_penetration_ma7: number;
+  b_series_ratio: number;
+  b_series_ratio_ma20: number;
+  b_series_contact_penetration: number;
+  b_series_contact_penetration_ma7: number;
+  c_series_ratio: number;
+  c_series_ratio_ma20: number;
+  c_series_contact_penetration: number;
+  c_series_contact_penetration_ma7: number;
+  d_series_ratio: number;
+  d_series_ratio_ma20: number;
+  d_series_contact_penetration: number;
+  d_series_contact_penetration_ma7: number;
+  lafa_series_ratio: number;
+  lafa_series_ratio_ma20: number;
+  lafa_series_contact_penetration: number;
+  lafa_series_contact_penetration_ma7: number;
+  wuyou_five_year_ratio: number;
 }
 
 export interface DashboardOverview {
