@@ -357,6 +357,16 @@ async def get_trend_data(
                 f"{key}_ratio": round((getattr(row, f"{key}_count") or 0) / t, 4) if t > 0 else 0.0
                 for key in TREND_SERIES_GROUPS
             },
+            "other_series_ratio": round(
+                max(
+                    t - sum(
+                        getattr(row, f"{key}_count") or 0
+                        for key in TREND_SERIES_GROUPS
+                    ),
+                    0,
+                ) / t,
+                4,
+            ) if t > 0 else 0.0,
             **{
                 f"{key}_contact_penetration": round(
                     (getattr(row, f"{key}_deals") or 0) /

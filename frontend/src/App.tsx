@@ -9,6 +9,7 @@ import PerformanceDetail from "./pages/PerformanceDetail";
 import ComparePage from "./pages/ComparePage";
 import TrendComparePage from "./pages/TrendComparePage";
 import MappingPage from "./pages/MappingPage";
+import StoreAnalysisPage from "./pages/StoreAnalysisPage";
 
 export default function App() {
   return (
@@ -17,6 +18,7 @@ export default function App() {
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/upload" element={<UploadPage />} />
         <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/store-analysis" element={<StoreAnalysisPage />} />
         <Route path="/funnel" element={<FunnelPage />} />
         <Route path="/orders" element={<OrdersPage />} />
         <Route path="/performance" element={<PerformancePage />} />

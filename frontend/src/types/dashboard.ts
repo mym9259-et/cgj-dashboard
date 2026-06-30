@@ -66,6 +66,7 @@ export interface TrendItem {
   lafa_series_ratio_ma20: number;
   lafa_series_contact_penetration: number;
   lafa_series_contact_penetration_ma7: number;
+  other_series_ratio: number;
   wuyou_five_year_ratio: number;
 }
 

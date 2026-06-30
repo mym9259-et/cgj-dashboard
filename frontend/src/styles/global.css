@@ -27,3 +27,24 @@ body {
 .kpi-card .ant-statistic-content {
   font-size: 28px;
 }
+
+.overview-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
+  gap: 16px;
+}
+
+.overview-kpi-grid-spaced {
+  margin-top: 16px;
+}
+
+@media (max-width: 640px) {
+  .chart-container,
+  .chart-container > div {
+    height: 340px !important;
+  }
+
+  .kpi-card .ant-statistic-content {
+    font-size: 24px;
+  }
+}

@@ -90,6 +90,7 @@ class TrendItem(BaseModel):
     lafa_series_ratio_ma20: float = 0.0
     lafa_series_contact_penetration: float = 0.0
     lafa_series_contact_penetration_ma7: float = 0.0
+    other_series_ratio: float = 0.0
     wuyou_five_year_ratio: float = 0.0
 
 

@@ -8,12 +8,14 @@ import {
   PieChartOutlined,
   TeamOutlined,
   SwapOutlined,
+  ShopOutlined,
 } from "@ant-design/icons";
 
 const menuItems = [
   { key: "/mapping", icon: <AuditOutlined />, label: "映射管理" },
   { key: "/upload", icon: <UploadOutlined />, label: "数据上传" },
   { key: "/dashboard", icon: <DashboardOutlined />, label: "概览看板" },
+  { key: "/store-analysis", icon: <ShopOutlined />, label: "门店分析" },
   { key: "/funnel", icon: <FunnelPlotOutlined />, label: "转化漏斗" },
   { key: "/orders", icon: <PieChartOutlined />, label: "订单结构" },
   { key: "/performance", icon: <TeamOutlined />, label: "人员业绩" },
