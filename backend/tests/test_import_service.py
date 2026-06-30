@@ -8,7 +8,8 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.database import Base
 from app.models.lead import Lead
-from app.services.import_service import import_from_excel
+from app.models.upload import UploadBatch
+from app.services.import_service import _utcnow_naive, import_from_excel
 
 
 class ImportReplacementTest(unittest.IsolatedAsyncioTestCase):
@@ -49,6 +50,9 @@ class ImportReplacementTest(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(len(rows), 1)
                 self.assertEqual(rows[0].source_id, "new-row")
                 self.assertEqual(rows[0].batch_id, result["batch_id"])
+                batch = await db.get(UploadBatch, result["batch_id"])
+                self.assertIsNotNone(batch.completed_at)
+                self.assertIsNone(batch.completed_at.tzinfo)
             finally:
                 Path(filepath).unlink(missing_ok=True)
 
@@ -109,6 +113,9 @@ class ImportReplacementTest(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(old_row.source_id, "old-row")
             finally:
                 Path(filepath).unlink(missing_ok=True)
+
+    def test_utcnow_is_timezone_naive_for_database_compatibility(self):
+        self.assertIsNone(_utcnow_naive().tzinfo)
 
 
 if __name__ == "__main__":

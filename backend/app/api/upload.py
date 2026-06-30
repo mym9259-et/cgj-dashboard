@@ -92,7 +92,12 @@ async def upload_import(
         return result
     except Exception as e:
         logger.exception(f"Import failed: {e}")
-        raise
+        if isinstance(e, ValueError):
+            raise HTTPException(status_code=400, detail=str(e)) from e
+        raise HTTPException(
+            status_code=500,
+            detail="导入失败，原有数据已保留，请稍后重试或联系管理员",
+        ) from e
 
 
 @router.get("/upload/status/{upload_id}")

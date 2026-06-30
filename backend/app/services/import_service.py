@@ -108,7 +108,7 @@ async def import_from_excel(
         batch.valid_count = valid_rows
         batch.error_count = error_rows
         batch.status = "completed"
-        batch.completed_at = datetime.now(timezone.utc)
+        batch.completed_at = _utcnow_naive()
         if all_errors:
             batch.error_log = {"errors": all_errors[:1000]}  # Cap error log size
         await db.commit()
@@ -338,3 +338,8 @@ def _datetime_or_none(val) -> datetime | None:
             except ValueError:
                 continue
     return None
+
+
+def _utcnow_naive() -> datetime:
+    """Return UTC time compatible with timezone-naive database columns."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)

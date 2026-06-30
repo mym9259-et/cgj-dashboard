@@ -91,8 +91,8 @@ export default function UploadPage() {
       const detail = e.response?.data?.detail || e.response?.data?.message || e.message;
       console.error("Import error:", e.response?.data || e);
       message.error("导入失败: " + detail);
-      setImportResult({ total_rows: 0, valid_rows: 0, error_rows: 0, errors: [{ row: 0, errors: [detail] }] });
-      store.setStep("done");
+      setImportResult(null);
+      store.setError(detail);
     }
   };
 
