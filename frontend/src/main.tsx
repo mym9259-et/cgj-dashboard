@@ -6,12 +6,15 @@ import zhCN from "antd/locale/zh_CN";
 import App from "./App";
 import { themeConfig } from "./styles/theme";
 import "./styles/global.css";
+import { AuthProvider } from "./contexts/AuthContext";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <ConfigProvider locale={zhCN} theme={themeConfig}>
       <BrowserRouter>
-        <App />
+        <AuthProvider>
+          <App />
+        </AuthProvider>
       </BrowserRouter>
     </ConfigProvider>
   </React.StrictMode>

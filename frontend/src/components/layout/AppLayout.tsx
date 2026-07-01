@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useLocation } from "react-router-dom";
 import SideMenu from "./SideMenu";
 import HeaderBar from "./HeaderBar";
+import UserMenu from "../auth/UserMenu";
 
 const { Content, Sider } = Layout;
 
@@ -47,6 +48,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </span>
         </div>
         <SideMenu />
+        <div
+          style={{
+            position: "absolute",
+            left: collapsed ? 10 : 16,
+            bottom: isNarrow ? 12 : 52,
+          }}
+        >
+          <UserMenu collapsed={collapsed} />
+        </div>
       </Sider>
       <Layout>
         {showGlobalFilters ? <HeaderBar /> : null}
