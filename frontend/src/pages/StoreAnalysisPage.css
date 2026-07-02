@@ -134,6 +134,48 @@
   border-top: 2px solid #d9d9d9 !important;
 }
 
+.period-sparkline {
+  margin: 0 auto;
+}
+
+.salesperson-trend-controls {
+  display: flex;
+  gap: 8px;
+  max-width: 70vw;
+}
+
+.salesperson-trend-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px 24px;
+}
+
+.salesperson-trend-chart {
+  min-width: 0;
+}
+
+.salesperson-trend-chart h3 {
+  margin: 0 0 4px;
+  color: #262626;
+  font-size: 14px;
+  letter-spacing: 0;
+}
+
+.heat-value {
+  display: inline-block;
+  min-width: 72px;
+  padding: 3px 6px;
+  border-radius: 3px;
+  color: #262626;
+  text-align: right;
+}
+
+.store-summary-row > td {
+  background: #f5f7fa !important;
+  color: #262626;
+  font-weight: 600;
+}
+
 .series-penetration-label {
   padding-left: 14px;
   color: #595959;
@@ -179,6 +221,14 @@
     border-right: 0;
     border-bottom: 1px solid #f0f0f0;
   }
+
+  .salesperson-trend-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .salesperson-trend-controls {
+    max-width: 55vw;
+  }
 }
 
 @media (max-width: 640px) {
@@ -188,5 +238,15 @@
 
   .store-analysis-heading h1 {
     font-size: 21px;
+  }
+
+  .salesperson-trend-controls {
+    align-items: stretch;
+    flex-direction: column;
+    max-width: 58vw;
+  }
+
+  .salesperson-trend-controls > * {
+    width: 100% !important;
   }
 }

@@ -64,6 +64,7 @@ class SeriesSalespersonMetrics(BaseModel):
 
 class SalespersonStoreMetrics(BaseModel):
     salesperson: str
+    first_record_date: date | None = None
     deliveries: int = 0
     contacted: int = 0
     deals: int = 0
@@ -77,11 +78,28 @@ class SalespersonStoreMetrics(BaseModel):
     lafa_series: SeriesSalespersonMetrics
 
 
+class SalespersonTrendItem(BaseModel):
+    day: date
+    salesperson: str
+    deliveries: int = 0
+    contacted: int = 0
+    deals: int = 0
+    total_revenue: float = 0.0
+    contact_rate: float = 0.0
+    contact_penetration: float = 0.0
+    contact_penetration_ma7: float = 0.0
+    delivery_penetration: float = 0.0
+    avg_deal_amount: float = 0.0
+    wuyou_five_year_ratio: float = 0.0
+
+
 class StoreSalespeopleResponse(BaseModel):
     store_name: str
     start_date: date
     end_date: date
+    summary: SalespersonStoreMetrics
     items: list[SalespersonStoreMetrics]
+    trend: list[SalespersonTrendItem]
 
 
 class StoreOptionsResponse(BaseModel):

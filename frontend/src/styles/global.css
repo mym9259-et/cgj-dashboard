@@ -38,6 +38,26 @@ body {
   margin-top: 16px;
 }
 
+.structure-metric-grid {
+  display: grid;
+  grid-template-columns: 120px repeat(4, 112px);
+  align-items: center;
+  gap: 10px 12px;
+  min-width: 616px;
+  max-width: calc(100vw - 48px);
+  padding: 4px;
+  overflow-x: auto;
+}
+
+.structure-metric-grid > strong {
+  color: #595959;
+  font-size: 12px;
+}
+
+.structure-metric-grid > span {
+  font-size: 13px;
+}
+
 @media (max-width: 640px) {
   .chart-container,
   .chart-container > div {

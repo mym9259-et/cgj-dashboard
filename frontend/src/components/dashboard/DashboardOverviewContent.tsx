@@ -1,11 +1,15 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import {
+  Button,
   Card,
+  Checkbox,
   Col,
+  Popover,
   Row,
   Select,
   Statistic,
 } from "antd";
+import { AppstoreOutlined } from "@ant-design/icons";
 import ReactECharts from "echarts-for-react";
 import { CHART_COLORS } from "../../utils/chartColors";
 import { formatCurrency, formatPercent } from "../../utils/formatters";
@@ -14,7 +18,18 @@ import type { DashboardOverview, TrendItem } from "../../types/dashboard";
 type MetricKey =
   | "leads" | "contacted" | "deals" | "revenue"
   | "delivery_penetration" | "contact_penetration" | "contact_rate"
-  | "delivery_penetration_ma7" | "contact_penetration_ma7";
+  | "delivery_penetration_ma7" | "contact_penetration_ma7"
+  | "a_series_ratio" | "a_series_ratio_ma7"
+  | "a_series_contact_penetration" | "a_series_contact_penetration_ma7"
+  | "b_series_ratio" | "b_series_ratio_ma7"
+  | "b_series_contact_penetration" | "b_series_contact_penetration_ma7"
+  | "c_series_ratio" | "c_series_ratio_ma7"
+  | "c_series_contact_penetration" | "c_series_contact_penetration_ma7"
+  | "d_series_ratio" | "d_series_ratio_ma7"
+  | "d_series_contact_penetration" | "d_series_contact_penetration_ma7"
+  | "lafa_series_ratio" | "lafa_series_ratio_ma7"
+  | "lafa_series_contact_penetration" | "lafa_series_contact_penetration_ma7"
+  | "wuyou_five_year_ratio" | "wuyou_avg_deal_amount";
 
 const SCALE_OPTIONS: { label: string; value: MetricKey }[] = [
   { label: "交付数", value: "leads" },
@@ -38,30 +53,58 @@ const METRIC_LABEL: Record<MetricKey, string> = {
   delivery_penetration_ma7: "交付渗透率 MA7",
   contact_penetration_ma7: "触客渗透率 MA7",
   contact_rate: "触客率",
+  a_series_ratio: "A系占比", a_series_ratio_ma7: "A系占比 MA7",
+  a_series_contact_penetration: "A系触客渗透率", a_series_contact_penetration_ma7: "A系触客渗透率 MA7",
+  b_series_ratio: "B系占比", b_series_ratio_ma7: "B系占比 MA7",
+  b_series_contact_penetration: "B系触客渗透率", b_series_contact_penetration_ma7: "B系触客渗透率 MA7",
+  c_series_ratio: "C系占比", c_series_ratio_ma7: "C系占比 MA7",
+  c_series_contact_penetration: "C系触客渗透率", c_series_contact_penetration_ma7: "C系触客渗透率 MA7",
+  d_series_ratio: "D系占比", d_series_ratio_ma7: "D系占比 MA7",
+  d_series_contact_penetration: "D系触客渗透率", d_series_contact_penetration_ma7: "D系触客渗透率 MA7",
+  lafa_series_ratio: "Lafa占比", lafa_series_ratio_ma7: "Lafa占比 MA7",
+  lafa_series_contact_penetration: "Lafa触客渗透率", lafa_series_contact_penetration_ma7: "Lafa触客渗透率 MA7",
+  wuyou_five_year_ratio: "无忧产品5年期占比",
+  wuyou_avg_deal_amount: "无忧产品客单价",
 };
 
 const PERCENT_METRICS = new Set<MetricKey>([
   "delivery_penetration", "contact_penetration", "contact_rate",
   "delivery_penetration_ma7", "contact_penetration_ma7",
+  "a_series_ratio", "a_series_ratio_ma7", "a_series_contact_penetration", "a_series_contact_penetration_ma7",
+  "b_series_ratio", "b_series_ratio_ma7", "b_series_contact_penetration", "b_series_contact_penetration_ma7",
+  "c_series_ratio", "c_series_ratio_ma7", "c_series_contact_penetration", "c_series_contact_penetration_ma7",
+  "d_series_ratio", "d_series_ratio_ma7", "d_series_contact_penetration", "d_series_contact_penetration_ma7",
+  "lafa_series_ratio", "lafa_series_ratio_ma7", "lafa_series_contact_penetration", "lafa_series_contact_penetration_ma7",
+  "wuyou_five_year_ratio",
 ]);
 
 const DEFAULT_SCALE_METRICS: MetricKey[] = [
   "leads", "deals", "delivery_penetration", "contact_penetration",
 ];
 
-const COMPOSITION_SERIES = [
-  { key: "a_series_ratio", label: "A系", color: "#1677ff" },
-  { key: "b_series_ratio", label: "B系", color: "#52c41a" },
-  { key: "c_series_ratio", label: "C系", color: "#faad14" },
-  { key: "d_series_ratio", label: "D系", color: "#ff4d4f" },
-  { key: "lafa_series_ratio", label: "Lafa", color: "#722ed1" },
-  { key: "other_series_ratio", label: "其他", color: "#8c8c8c" },
-] as const;
+const DEFAULT_STRUCTURE_METRICS: MetricKey[] = [
+  "a_series_ratio", "b_series_ratio", "c_series_ratio",
+  "d_series_ratio", "lafa_series_ratio", "wuyou_five_year_ratio",
+];
 
-function buildTrendOption(selected: MetricKey[], trend: TrendItem[]) {
+type MatrixColumn = "ratio" | "ratioMa7" | "penetration" | "penetrationMa7";
+type MatrixRow = { label: string } & Partial<Record<MatrixColumn, MetricKey>>;
+const MATRIX_COLUMNS: { key: MatrixColumn; label: string }[] = [
+  { key: "ratio", label: "当日占比" }, { key: "ratioMa7", label: "占比 MA7" },
+  { key: "penetration", label: "触客渗透率" }, { key: "penetrationMa7", label: "渗透率 MA7" },
+];
+const STRUCTURE_ROWS: MatrixRow[] = [
+  { label: "A系", ratio: "a_series_ratio", ratioMa7: "a_series_ratio_ma7", penetration: "a_series_contact_penetration", penetrationMa7: "a_series_contact_penetration_ma7" },
+  { label: "B系", ratio: "b_series_ratio", ratioMa7: "b_series_ratio_ma7", penetration: "b_series_contact_penetration", penetrationMa7: "b_series_contact_penetration_ma7" },
+  { label: "C系", ratio: "c_series_ratio", ratioMa7: "c_series_ratio_ma7", penetration: "c_series_contact_penetration", penetrationMa7: "c_series_contact_penetration_ma7" },
+  { label: "D系", ratio: "d_series_ratio", ratioMa7: "d_series_ratio_ma7", penetration: "d_series_contact_penetration", penetrationMa7: "d_series_contact_penetration_ma7" },
+  { label: "Lafa", ratio: "lafa_series_ratio", ratioMa7: "lafa_series_ratio_ma7", penetration: "lafa_series_contact_penetration", penetrationMa7: "lafa_series_contact_penetration_ma7" },
+];
+
+function buildTrendOption(selected: MetricKey[], trend: TrendItem[], benchmark?: number) {
   const hasPercent = selected.some((metric) => PERCENT_METRICS.has(metric));
-  const hasCount = selected.some((metric) => !PERCENT_METRICS.has(metric) && metric !== "revenue");
-  const hasRevenue = selected.includes("revenue");
+  const hasCount = selected.some((metric) => !PERCENT_METRICS.has(metric) && !["revenue", "wuyou_avg_deal_amount"].includes(metric));
+  const hasRevenue = selected.some((metric) => ["revenue", "wuyou_avg_deal_amount"].includes(metric));
   const yAxis: any[] = [];
 
   if (hasCount || hasRevenue) {
@@ -108,6 +151,13 @@ function buildTrendOption(selected: MetricKey[], trend: TrendItem[]) {
         showSymbol: false,
         itemStyle: { color: CHART_COLORS[index % CHART_COLORS.length] },
         lineStyle: { width: 2, type: isMovingAverage ? "dashed" as const : "solid" as const },
+        markLine: benchmark !== undefined ? {
+          silent: true,
+          symbol: "none",
+          label: { formatter: `周期加权均值 ${(benchmark * 100).toFixed(1)}%`, color: "#595959" },
+          lineStyle: { color: "#595959", type: "dashed", width: 1.5 },
+          data: [{ yAxis: benchmark }],
+        } : undefined,
       };
     }),
   };
@@ -135,65 +185,46 @@ function SeriesRatioCard({ title, ratio, count, contactPenetration }: SeriesRati
   );
 }
 
-function buildCompositionOption(trend: TrendItem[]) {
-  const normalized = trend.map((item) => {
-    const values = COMPOSITION_SERIES.map((series) => item[series.key] || 0);
-    const total = values.reduce((sum, value) => sum + value, 0);
-    return total > 0 ? values.map((value) => value / total) : values;
-  });
-
-  return {
-    tooltip: {
-      trigger: "axis",
-      axisPointer: { type: "shadow" },
-      formatter: (params: any) => {
-        const items = Array.isArray(params) ? params : [params];
-        const total = items.reduce((sum: number, item: any) => sum + Number(item.value || 0), 0);
-        const lines = items
-          .slice()
-          .reverse()
-          .map((item: any) => `${item.marker} ${item.seriesName}: ${formatPercent(item.value, 1)}`);
-        return `<strong>${items[0]?.axisValue || ""}</strong><br/>${lines.join("<br/>")}<br/>合计: ${formatPercent(total, 1)}`;
-      },
-    },
-    legend: {
-      data: COMPOSITION_SERIES.map((series) => series.label),
-      top: 0,
-      type: "scroll" as const,
-    },
-    grid: { left: 52, right: 24, top: 42, bottom: 68, containLabel: true },
-    xAxis: {
-      type: "category",
-      data: trend.map((item) => item.day),
-      axisLabel: { rotate: 45, fontSize: 10 },
-    },
-    yAxis: {
-      type: "value",
-      min: 0,
-      max: 1,
-      interval: 0.2,
-      axisLabel: { formatter: (value: number) => `${Math.round(value * 100)}%` },
-    },
-    dataZoom: [
-      { type: "inside" as const, start: Math.max(0, 100 - Math.min(100, 3000 / Math.max(trend.length, 1))), end: 100 },
-      { type: "slider" as const, height: 18, bottom: 10, start: Math.max(0, 100 - Math.min(100, 3000 / Math.max(trend.length, 1))), end: 100 },
-    ],
-    series: COMPOSITION_SERIES.map((series, seriesIndex) => ({
-      name: series.label,
-      type: "bar",
-      stack: "delivery-composition",
-      barMaxWidth: 28,
-      emphasis: { focus: "series" },
-      itemStyle: { color: series.color },
-      data: normalized.map((values) => values[seriesIndex]),
-    })),
+function StructureMetricSelector({ value, onChange }: { value: MetricKey[]; onChange: (value: MetricKey[]) => void }) {
+  const toggle = (metric: MetricKey, checked: boolean) => {
+    if (checked) onChange([...value, metric]);
+    else if (value.length > 1) onChange(value.filter((item) => item !== metric));
   };
+  const content = (
+    <div className="structure-metric-grid">
+      <strong>车系</strong>
+      {MATRIX_COLUMNS.map((column) => <strong key={column.key}>{column.label}</strong>)}
+      {STRUCTURE_ROWS.flatMap((row) => [
+        <span key={`${row.label}-label`}>{row.label}</span>,
+        ...MATRIX_COLUMNS.map((column) => {
+          const metric = row[column.key];
+          return metric ? <Checkbox key={`${row.label}-${column.key}`} checked={value.includes(metric)}
+            disabled={value.length === 1 && value.includes(metric)} onChange={(event) => toggle(metric, event.target.checked)} />
+            : <span key={`${row.label}-${column.key}`}>-</span>;
+        }),
+      ])}
+      <span>无忧产品</span><Checkbox checked={value.includes("wuyou_five_year_ratio")} onChange={(event) => toggle("wuyou_five_year_ratio", event.target.checked)} />
+      <span>-</span><span>-</span><span>-</span>
+      <span>无忧产品客单价</span><Checkbox checked={value.includes("wuyou_avg_deal_amount")} onChange={(event) => toggle("wuyou_avg_deal_amount", event.target.checked)} />
+      <span>-</span><span>-</span><span>-</span>
+    </div>
+  );
+  return <Popover trigger="click" placement="bottomRight" content={content}>
+    <Button size="small" icon={<AppstoreOutlined />}>结构指标 {value.length}</Button>
+  </Popover>;
 }
 
-export function DashboardOverviewContent({ data }: { data: DashboardOverview }) {
+export function DashboardOverviewContent({ data, betweenTrends }: { data: DashboardOverview; betweenTrends?: ReactNode }) {
   const [scaleMetrics, setScaleMetrics] = useState<MetricKey[]>(DEFAULT_SCALE_METRICS);
+  const [structureMetrics, setStructureMetrics] = useState<MetricKey[]>(DEFAULT_STRUCTURE_METRICS);
   const { kpis, trend } = data;
   const penColor = (value: number, threshold: number) => value >= threshold ? "#52c41a" : "#faad14";
+  const benchmarkKey = structureMetrics.length === 1
+    ? structureMetrics[0].match(/^([a-z]+_series)_ratio(?:_ma7)?$/)?.[1]
+    : undefined;
+  const benchmark = benchmarkKey
+    ? kpis[`${benchmarkKey}_ratio` as keyof typeof kpis] as number
+    : undefined;
 
   return (
     <div>
@@ -229,8 +260,12 @@ export function DashboardOverviewContent({ data }: { data: DashboardOverview }) 
         <div className="chart-container"><ReactECharts option={buildTrendOption(scaleMetrics, trend)} style={{ height: 400 }} notMerge /></div>
       </Card>
 
-      <Card title="车系交付结构趋势" style={{ marginTop: 16 }}>
-        <div className="chart-container"><ReactECharts option={buildCompositionOption(trend)} style={{ height: 400 }} notMerge /></div>
+      {betweenTrends}
+
+      <Card title="车系交付结构趋势" style={{ marginTop: 16 }} extra={
+        <StructureMetricSelector value={structureMetrics} onChange={setStructureMetrics} />
+      }>
+        <div className="chart-container"><ReactECharts option={buildTrendOption(structureMetrics, trend, benchmark)} style={{ height: 400 }} notMerge /></div>
       </Card>
     </div>
   );

@@ -47,6 +47,7 @@ export type SeriesSalespersonMetrics = {
 
 export type SalespersonStoreMetrics = {
   salesperson: string;
+  first_record_date: string | null;
   deliveries: number;
   contacted: number;
   deals: number;
@@ -60,11 +61,33 @@ export type SalespersonStoreMetrics = {
   lafa_series: SeriesSalespersonMetrics;
 };
 
+export type SalespersonTrendMetricKey =
+  | "deliveries" | "contacted" | "deals" | "total_revenue"
+  | "contact_rate" | "contact_penetration" | "contact_penetration_ma7"
+  | "delivery_penetration" | "avg_deal_amount" | "wuyou_five_year_ratio";
+
+export type SalespersonTrendItem = {
+  day: string;
+  salesperson: string;
+  deliveries: number;
+  contacted: number;
+  deals: number;
+  total_revenue: number;
+  contact_rate: number;
+  contact_penetration: number;
+  contact_penetration_ma7: number;
+  delivery_penetration: number;
+  avg_deal_amount: number;
+  wuyou_five_year_ratio: number;
+};
+
 export type StoreSalespeople = {
   store_name: string;
   start_date: string;
   end_date: string;
+  summary: SalespersonStoreMetrics;
   items: SalespersonStoreMetrics[];
+  trend: SalespersonTrendItem[];
 };
 
 export type StoreAnalysisData = {

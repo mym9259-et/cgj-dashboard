@@ -300,8 +300,15 @@ async def get_salespeople_metrics(
         ).label(f"{key}_contacted")
         for key, series in TREND_SERIES_GROUPS.items()
     ]
+    series_deal_columns = [
+        func.count().filter(
+            _series_group_condition(series),
+            Lead.deal_status == DEAL_STATUS_SUCCESS,
+        ).label(f"{key}_deals")
+        for key, series in TREND_SERIES_GROUPS.items()
+    ]
     store_totals_stmt = (
-        select(*series_contact_columns)
+        select(*series_contact_columns, *series_deal_columns)
         .select_from(Lead)
         .where(
             Lead.merchant_name == store_name,
@@ -310,6 +317,17 @@ async def get_salespeople_metrics(
         )
     )
     store_totals = (await db.execute(store_totals_stmt)).one()
+
+    first_record_rows = await db.execute(
+        select(Lead.salesperson, func.min(Lead.delivery_date))
+        .where(
+            Lead.salesperson.isnot(None),
+            Lead.salesperson != "",
+            Lead.delivery_date.isnot(None),
+        )
+        .group_by(Lead.salesperson)
+    )
+    first_record_dates = {row[0]: row[1] for row in first_record_rows.all()}
 
     stmt = (
         select(
@@ -330,13 +348,7 @@ async def get_salespeople_metrics(
                 Lead.product_years.in_(["5"]),
             ).label("wuyou_five_year_deals"),
             *series_contact_columns,
-            *[
-                func.count().filter(
-                    _series_group_condition(series),
-                    Lead.deal_status == DEAL_STATUS_SUCCESS,
-                ).label(f"{key}_deals")
-                for key, series in TREND_SERIES_GROUPS.items()
-            ],
+            *series_deal_columns,
         )
         .select_from(Lead)
         .where(
@@ -354,6 +366,7 @@ async def get_salespeople_metrics(
     for row in rows:
         item = {
             "salesperson": row.salesperson,
+            "first_record_date": first_record_dates.get(row.salesperson),
             "deliveries": row.deliveries or 0,
             "contacted": row.contacted or 0,
             "deals": row.deals or 0,
@@ -368,17 +381,116 @@ async def get_salespeople_metrics(
         for key in TREND_SERIES_GROUPS:
             contacted = getattr(row, f"{key}_contacted") or 0
             deals = getattr(row, f"{key}_deals") or 0
-            store_contacted = getattr(store_totals, f"{key}_contacted") or 0
             item[key] = {
-                "contact_share": _safe_ratio(contacted, store_contacted),
+                "contact_share": _safe_ratio(contacted, row.contacted or 0),
                 "contact_penetration": _safe_ratio(deals, contacted),
             }
         items.append(item)
 
     items.sort(key=lambda item: (-item["contact_penetration"], -item["deliveries"], item["salesperson"]))
+
+    store_deliveries = sum(item["deliveries"] for item in items)
+    store_contacted_count = sum(item["contacted"] for item in items)
+    store_deals = sum(item["deals"] for item in items)
+    store_revenue = sum(float(row.total_revenue or 0) for row in rows)
+    store_wuyou_deals = sum(row.wuyou_deals or 0 for row in rows)
+    store_wuyou_five_year_deals = sum(row.wuyou_five_year_deals or 0 for row in rows)
+    summary = {
+        "salesperson": "门店汇总",
+        "first_record_date": None,
+        "deliveries": store_deliveries,
+        "contacted": store_contacted_count,
+        "deals": store_deals,
+        "contact_penetration": _safe_ratio(store_deals, store_contacted_count),
+        "avg_deal_amount": round(store_revenue / store_deals, 2) if store_deals else 0.0,
+        "wuyou_five_year_ratio": _safe_ratio(
+            store_wuyou_five_year_deals, store_wuyou_deals
+        ),
+    }
+    for key in TREND_SERIES_GROUPS:
+        contacted = getattr(store_totals, f"{key}_contacted") or 0
+        deals = getattr(store_totals, f"{key}_deals") or 0
+        summary[key] = {
+            "contact_share": _safe_ratio(contacted, store_contacted_count),
+            "contact_penetration": _safe_ratio(deals, contacted),
+        }
+
+    daily_stmt = (
+        select(
+            Lead.delivery_date.label("day"),
+            Lead.salesperson,
+            func.count().label("deliveries"),
+            func.count().filter(Lead.contact_status == CONTACT_STATUS_REACHED).label("contacted"),
+            func.count().filter(Lead.deal_status == DEAL_STATUS_SUCCESS).label("deals"),
+            func.coalesce(
+                func.sum(Lead.deal_amount).filter(Lead.deal_status == DEAL_STATUS_SUCCESS), 0
+            ).label("total_revenue"),
+            func.count().filter(
+                Lead.deal_status == DEAL_STATUS_SUCCESS,
+                Lead.product_type == "无忧产品",
+            ).label("wuyou_deals"),
+            func.count().filter(
+                Lead.deal_status == DEAL_STATUS_SUCCESS,
+                Lead.product_type == "无忧产品",
+                Lead.product_years.in_(["5"]),
+            ).label("wuyou_five_year_deals"),
+        )
+        .where(
+            Lead.merchant_name == store_name,
+            Lead.delivery_date >= start_date,
+            Lead.delivery_date <= end_date,
+            Lead.salesperson.isnot(None),
+            Lead.salesperson != "",
+        )
+        .group_by(Lead.delivery_date, Lead.salesperson)
+        .order_by(Lead.delivery_date, Lead.salesperson)
+    )
+    daily_rows = (await db.execute(daily_stmt)).all()
+    row_map = {(row.salesperson, row.day): row for row in daily_rows}
+    trend = []
+    for item in items:
+        salesperson = item["salesperson"]
+        person_days = []
+        cursor = start_date
+        while cursor <= end_date:
+            row = row_map.get((salesperson, cursor))
+            deliveries = row.deliveries or 0 if row else 0
+            contacted = row.contacted or 0 if row else 0
+            deals = row.deals or 0 if row else 0
+            revenue = float(row.total_revenue or 0) if row else 0.0
+            wuyou_deals = row.wuyou_deals or 0 if row else 0
+            wuyou_five_year_deals = row.wuyou_five_year_deals or 0 if row else 0
+            person_days.append({
+                "day": cursor,
+                "salesperson": salesperson,
+                "deliveries": deliveries,
+                "contacted": contacted,
+                "deals": deals,
+                "total_revenue": round(revenue, 2),
+                "contact_rate": _safe_ratio(contacted, deliveries),
+                "contact_penetration": _safe_ratio(deals, contacted),
+                "delivery_penetration": _safe_ratio(deals, deliveries),
+                "avg_deal_amount": round(revenue / deals, 2) if deals else 0.0,
+                "wuyou_five_year_ratio": _safe_ratio(
+                    wuyou_five_year_deals, wuyou_deals
+                ),
+            })
+            cursor += timedelta(days=1)
+
+        for index, day_item in enumerate(person_days):
+            window = person_days[max(0, index - 6):index + 1]
+            window_contacted = sum(day["contacted"] for day in window)
+            window_deals = sum(day["deals"] for day in window)
+            day_item["contact_penetration_ma7"] = _safe_ratio(
+                window_deals, window_contacted
+            )
+        trend.extend(person_days)
+
     return {
         "store_name": store_name,
         "start_date": start_date,
         "end_date": end_date,
+        "summary": summary,
         "items": items,
+        "trend": trend,
     }

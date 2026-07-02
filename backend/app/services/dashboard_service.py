@@ -318,6 +318,10 @@ async def get_trend_data(
             Lead.deal_status == DEAL_STATUS_SUCCESS,
             Lead.product_type == "无忧产品",
         ).label("wuyou_deals"),
+        func.coalesce(func.sum(Lead.deal_amount).filter(
+            Lead.deal_status == DEAL_STATUS_SUCCESS,
+            Lead.product_type == "无忧产品",
+        ), 0).label("wuyou_revenue"),
         func.count().filter(
             Lead.deal_status == DEAL_STATUS_SUCCESS,
             Lead.product_type == "无忧产品",
@@ -376,10 +380,22 @@ async def get_trend_data(
                 for key in TREND_SERIES_GROUPS
             },
             "wuyou_five_year_ratio": round((row.wuyou_five_year_deals or 0) / wuyou_deals, 4) if wuyou_deals > 0 else 0.0,
+            "wuyou_avg_deal_amount": round(float(row.wuyou_revenue or 0) / wuyou_deals, 2) if wuyou_deals > 0 else 0.0,
         })
 
-    # Calculate MA7 (7-day moving average of the ratio, not average of individual daily ratios)
-    # MA7 delivery_penetration = sum(deals[last 7 days]) / sum(leads[last 7 days])
+    apply_moving_metrics(daily)
+
+    for item in daily:
+        for key in TREND_SERIES_GROUPS:
+            item.pop(f"{key}_count", None)
+            item.pop(f"{key}_contacted", None)
+            item.pop(f"{key}_deals", None)
+
+    return daily
+
+
+def apply_moving_metrics(daily: list[dict]) -> None:
+    """Add weighted seven-day ratios in place using summed numerators/denominators."""
     for i, item in enumerate(daily):
         start_idx = max(0, i - 6)
         window = daily[start_idx : i + 1]
@@ -397,12 +413,10 @@ async def get_trend_data(
         else:
             item["contact_penetration_ma7"] = 0.0
 
-        window20 = daily[max(0, i - 19) : i + 1]
-        sum_leads20 = sum(d["leads"] for d in window20)
         for key in TREND_SERIES_GROUPS:
-            series_count20 = sum(d[f"{key}_count"] for d in window20)
-            item[f"{key}_ratio_ma20"] = (
-                round(series_count20 / sum_leads20, 4) if sum_leads20 > 0 else 0.0
+            series_count7 = sum(d[f"{key}_count"] for d in window)
+            item[f"{key}_ratio_ma7"] = (
+                round(series_count7 / sum_leads, 4) if sum_leads > 0 else 0.0
             )
 
             series_contacted7 = sum(d[f"{key}_contacted"] for d in window)
@@ -411,15 +425,6 @@ async def get_trend_data(
                 round(series_deals7 / series_contacted7, 4)
                 if series_contacted7 > 0 else 0.0
             )
-
-    for item in daily:
-        for key in TREND_SERIES_GROUPS:
-            item.pop(f"{key}_count", None)
-            item.pop(f"{key}_contacted", None)
-            item.pop(f"{key}_deals", None)
-
-    return daily
-
 
 async def get_distinct_values(db: AsyncSession, fields: list[str]) -> dict[str, list[str]]:
     """Get distinct values for filter dropdowns (supports both Lead and StoreMapping fields)."""

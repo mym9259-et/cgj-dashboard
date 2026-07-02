@@ -5,7 +5,7 @@ from types import SimpleNamespace
 from sqlalchemy import select
 
 from app.models.lead import Lead
-from app.services.dashboard_service import _build_where_clauses, get_kpi_data
+from app.services.dashboard_service import TREND_SERIES_GROUPS, _build_where_clauses, apply_moving_metrics, get_kpi_data
 
 
 class ScalarSession:
@@ -21,6 +21,20 @@ class ScalarSession:
 
 
 class DashboardServiceTest(unittest.IsolatedAsyncioTestCase):
+    def test_series_ma7_is_weighted_by_delivery_volume(self):
+        daily = []
+        for leads, a_count in ((1, 1), (9, 0)):
+            item = {"leads": leads, "contacted": leads, "deals": 0}
+            for key in TREND_SERIES_GROUPS:
+                item[f"{key}_count"] = a_count if key == "a_series" else 0
+                item[f"{key}_contacted"] = 0
+                item[f"{key}_deals"] = 0
+            daily.append(item)
+
+        apply_moving_metrics(daily)
+
+        self.assertEqual(daily[-1]["a_series_ratio_ma7"], 0.1)
+
     def test_global_date_range_filters_delivery_date(self):
         clauses, _ = _build_where_clauses(
             None,
