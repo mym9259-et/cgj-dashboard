@@ -4,14 +4,11 @@ import AppLayout from "./components/layout/AppLayout";
 import { useAuth } from "./contexts/AuthContext";
 import ComparePage from "./pages/ComparePage";
 import DashboardPage from "./pages/DashboardPage";
-import FunnelPage from "./pages/FunnelPage";
 import LoginPage from "./pages/LoginPage";
 import MappingPage from "./pages/MappingPage";
-import OrdersPage from "./pages/OrdersPage";
-import PerformanceDetail from "./pages/PerformanceDetail";
-import PerformancePage from "./pages/PerformancePage";
 import StoreAnalysisPage from "./pages/StoreAnalysisPage";
-import TrendComparePage from "./pages/TrendComparePage";
+import PeopleAnalysisPage from "./pages/PeopleAnalysisPage";
+import IndividualAnalysisPage from "./pages/IndividualAnalysisPage";
 import UploadPage from "./pages/UploadPage";
 
 function ProtectedRoutes() {
@@ -22,12 +19,9 @@ function ProtectedRoutes() {
         <Route path="/upload" element={<UploadPage />} />
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/store-analysis" element={<StoreAnalysisPage />} />
-        <Route path="/funnel" element={<FunnelPage />} />
-        <Route path="/orders" element={<OrdersPage />} />
-        <Route path="/performance" element={<PerformancePage />} />
-        <Route path="/performance/:name" element={<PerformanceDetail />} />
+        <Route path="/people-analysis" element={<PeopleAnalysisPage />} />
+        <Route path="/people-analysis/individual" element={<IndividualAnalysisPage />} />
         <Route path="/compare" element={<ComparePage />} />
-        <Route path="/compare/trend" element={<TrendComparePage />} />
         <Route path="/mapping" element={<MappingPage />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>

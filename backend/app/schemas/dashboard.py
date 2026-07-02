@@ -65,6 +65,10 @@ class TrendItem(BaseModel):
     deals: int = 0
     revenue: float = 0.0
     refunds: int = 0
+    leads_ma7: float = 0.0
+    contacted_ma7: float = 0.0
+    deals_ma7: float = 0.0
+    contact_rate_ma7: float = 0.0
     delivery_penetration: float = 0.0
     contact_penetration: float = 0.0
     contact_rate: float = 0.0

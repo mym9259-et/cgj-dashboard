@@ -1,248 +1,75 @@
-import { useState } from "react";
-import {
-  Card,
-  Upload,
-  Button,
-  Tabs,
-  Table,
-  Tag,
-  Progress,
-  message,
-  Space,
-  Result,
-  Alert,
-} from "antd";
-import { InboxOutlined, UploadOutlined, CheckCircleOutlined, WarningOutlined } from "@ant-design/icons";
+import { useEffect, useState } from "react";
+import { Button, Card, Input, message, Popconfirm, Space, Switch, Table, Tabs, Tag, Upload } from "antd";
+import { DeleteOutlined, DownloadOutlined, PlusOutlined, SaveOutlined, UploadOutlined } from "@ant-design/icons";
 import apiClient from "../api/client";
+import { useAuth } from "../contexts/AuthContext";
 
-const { Dragger } = Upload;
+type MappingType = "store" | "car-series" | "personnel";
+type ColumnMeta = { key: string; label: string };
+type MappingPayload = { metadata: { columns: ColumnMeta[]; row_count: number; source_type: string | null; source_filename: string | null; updated_by: string | null; updated_at: string | null }; rows: Record<string, any>[] };
 
-/* ─────────── Store Mapping Section ─────────── */
+const LABELS: Record<MappingType, string> = { store: "门店信息映射", "car-series": "车系映射", personnel: "人员信息映射" };
 
-type UploadState = "idle" | "uploading" | "done" | "error";
+function MappingEditor({ type }: { type: MappingType }) {
+  const { user } = useAuth();
+  const editable = user?.role === "admin";
+  const [payload, setPayload] = useState<MappingPayload | null>(null);
+  const [rows, setRows] = useState<Record<string, any>[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-function StoreMappingSection() {
-  const [state, setState] = useState<UploadState>("idle");
-  const [progress, setProgress] = useState(0);
-  const [result, setResult] = useState<any>(null);
-  const [unmatched, setUnmatched] = useState<string[]>([]);
-  const [coverage, setCoverage] = useState(0);
-
-  const uploadFile = async (file: File) => {
-    setState("uploading");
-    setProgress(0);
-    const form = new FormData();
-    form.append("file", file);
+  const load = async () => {
+    setLoading(true);
     try {
-      setProgress(60);
-      const { data } = await apiClient.post("/store/mapping/upload", form);
-      setProgress(100);
-      setResult(data);
-      setState("done");
-      message.success(`门店映射表已导入: ${data.inserted} 条记录`);
-      const r2 = await apiClient.get("/store/mapping/unmatched");
-      setUnmatched(r2.data.unmatched_merchants || []);
-      setCoverage(r2.data.coverage ?? 0);
-    } catch (e: any) {
-      message.error("上传失败: " + (e?.response?.data?.detail || e.message));
-      setState("error");
-    }
+      const { data } = await apiClient.get(`/mapping-admin/${type}`);
+      setPayload(data);
+      setRows(data.rows.map((row: Record<string, any>) => ({ ...row, _key: row.id || crypto.randomUUID() })));
+    } finally { setLoading(false); }
+  };
+  useEffect(() => { load(); }, [type]);
+
+  const update = (key: string, field: string, value: any) => setRows((current) => current.map((row) => row._key === key ? { ...row, [field]: value } : row));
+  const columns = (payload?.metadata.columns || []).map((column) => ({
+    title: column.label, dataIndex: column.key, key: column.key, width: column.key === "merchant_name" ? 260 : 150,
+    render: (value: any, row: Record<string, any>) => column.key === "is_active"
+      ? <Switch size="small" checked={Boolean(value)} disabled={!editable} checkedChildren="在职" unCheckedChildren="离职" onChange={(checked) => update(row._key, column.key, checked)} />
+      : <Input variant="borderless" value={value ?? ""} readOnly={!editable} onChange={(event) => update(row._key, column.key, event.target.value)} />,
+  }));
+  if (editable) columns.push({ title: "操作", dataIndex: "_actions", key: "_actions", width: 70,
+    render: (_: any, row: Record<string, any>) => <Popconfirm title="删除这条映射？" onConfirm={() => setRows((current) => current.filter((item) => item._key !== row._key))}><Button danger type="text" icon={<DeleteOutlined />} /></Popconfirm> } as any);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await apiClient.put(`/mapping-admin/${type}`, rows.map(({ id, _key, ...row }) => row));
+      message.success("在线映射已保存");
+      await load();
+    } catch (error: any) { message.error(error?.response?.data?.detail || "保存失败"); }
+    finally { setSaving(false); }
   };
 
-  if (state === "done") {
-    return (
-      <Result
-        status={unmatched.length > 0 ? "warning" : "success"}
-        title="门店映射导入完成"
-        subTitle={`共导入 ${result?.inserted ?? 0} 条映射记录`}
-        extra={[
-          <Button key="again" onClick={() => { setState("idle"); setResult(null); }}>
-            重新上传
-          </Button>,
-        ]}
-      >
-        {unmatched.length > 0 && (
-          <Card size="small" title="映射覆盖情况" style={{ marginTop: 16 }}>
-            <Alert
-              type="warning"
-              message={`映射覆盖率: ${(coverage * 100).toFixed(0)}% — ${unmatched.length} 个门店未匹配`}
-              style={{ marginBottom: 12 }}
-            />
-            <Table
-              dataSource={unmatched.map((s, i) => ({ key: i, name: s }))}
-              columns={[{ title: "未匹配门店", dataIndex: "name", key: "name" }]}
-              size="small"
-              pagination={{ pageSize: 5 }}
-            />
-          </Card>
-        )}
-      </Result>
-    );
-  }
-
-  if (state === "error") {
-    return (
-      <Result
-        status="error"
-        title="上传失败"
-        extra={<Button type="primary" onClick={() => setState("idle")}>重试</Button>}
-      />
-    );
-  }
-
-  return (
-    <div>
-      <Dragger
-        accept=".xlsx,.xls"
-        maxCount={1}
-        beforeUpload={(file) => { uploadFile(file); return false; }}
-        showUploadList={false}
-        disabled={state === "uploading"}
-      >
-        <p className="ant-upload-drag-icon"><InboxOutlined /></p>
-        <p className="ant-upload-text">点击或拖拽门店映射表到此处上传</p>
-        <p className="ant-upload-hint">支持 .xlsx / .xls 格式</p>
-      </Dragger>
-      {state === "uploading" && (
-        <Card style={{ marginTop: 16 }}>
-          <Progress percent={progress} status="active" />
-          <p style={{ marginTop: 8, color: "#8c8c8c" }}>正在导入门店映射数据...</p>
-        </Card>
-      )}
-      <Card size="small" style={{ marginTop: 16 }}>
-        <p style={{ fontWeight: 500 }}>表格格式说明：</p>
-        <p style={{ color: "#8c8c8c", fontSize: 13 }}>
-          包含以下列：商户名称（必填）、大区、省份、城市、是否零售、门店总经理<br />
-          系统会自动识别列名进行映射，上传后将覆盖所有现有门店映射数据。
-        </p>
-      </Card>
+  const metadata = payload?.metadata;
+  return <div className="mapping-editor">
+    <div className="mapping-status-bar">
+      <div><strong>当前启用版本</strong><span>{metadata?.row_count || 0} 条记录</span>
+        <span>{metadata?.source_type === "upload" ? `上传文件：${metadata.source_filename}` : metadata?.source_type === "online" ? "在线编辑版本" : "尚无版本信息"}</span>
+        {metadata?.updated_at ? <span>更新于 {new Date(metadata.updated_at).toLocaleString()} · {metadata.updated_by || "系统"}</span> : null}</div>
+      <Space wrap>
+        <Button icon={<DownloadOutlined />} href={`/api/mapping-admin/${type}/download`}>下载当前表</Button>
+        {editable ? <Upload accept=".xlsx,.xls" showUploadList={false} beforeUpload={async (file) => {
+          const form = new FormData(); form.append("file", file);
+          try { await apiClient.post(`/mapping-admin/${type}/upload`, form); message.success("映射表已全量更新"); await load(); } catch (error: any) { message.error(error?.response?.data?.detail || "上传失败"); }
+          return false;
+        }}><Button icon={<UploadOutlined />}>上传全量表</Button></Upload> : null}
+        {editable ? <Button icon={<PlusOutlined />} onClick={() => setRows((current) => [...current, { _key: crypto.randomUUID(), is_active: true }])}>新增一行</Button> : null}
+        {editable ? <Button type="primary" icon={<SaveOutlined />} loading={saving} onClick={save}>保存在线编辑</Button> : null}
+      </Space>
     </div>
-  );
+    {!editable ? <Tag color="blue" style={{ marginBottom: 12 }}>普通用户为只读模式</Tag> : null}
+    <Table rowKey="_key" loading={loading} columns={columns as any} dataSource={rows} size="small" bordered sticky pagination={{ pageSize: 20, showSizeChanger: true }} scroll={{ x: "max-content", y: 560 }} />
+  </div>;
 }
-
-/* ─────────── Car Series Mapping Section ─────────── */
-
-function CarSeriesMappingSection() {
-  const [state, setState] = useState<UploadState>("idle");
-  const [progress, setProgress] = useState(0);
-  const [result, setResult] = useState<any>(null);
-  const [unmatched, setUnmatched] = useState<string[]>([]);
-  const [coverage, setCoverage] = useState(0);
-
-  const uploadFile = async (file: File) => {
-    setState("uploading");
-    setProgress(0);
-    const form = new FormData();
-    form.append("file", file);
-    try {
-      setProgress(60);
-      const { data } = await apiClient.post("/car-series/mapping/upload", form);
-      setProgress(100);
-      setResult(data);
-      setState("done");
-      message.success(`车系映射表已导入: ${data.inserted} 条记录`);
-      const r2 = await apiClient.get("/car-series/mapping/unmatched");
-      setUnmatched(r2.data.unmatched_series || []);
-      setCoverage(r2.data.coverage ?? 0);
-    } catch (e: any) {
-      message.error("上传失败: " + (e?.response?.data?.detail || e.message));
-      setState("error");
-    }
-  };
-
-  if (state === "done") {
-    return (
-      <Result
-        status={unmatched.length > 0 ? "warning" : "success"}
-        title="车系映射导入完成"
-        subTitle={`共导入 ${result?.inserted ?? 0} 条映射记录`}
-        extra={[
-          <Button key="again" onClick={() => { setState("idle"); setResult(null); }}>
-            重新上传
-          </Button>,
-        ]}
-      >
-        {unmatched.length > 0 && (
-          <Card size="small" title="映射覆盖情况" style={{ marginTop: 16 }}>
-            <Alert
-              type="warning"
-              message={`映射覆盖率: ${(coverage * 100).toFixed(0)}% — ${unmatched.length} 个车系未匹配`}
-              style={{ marginBottom: 12 }}
-            />
-            <Table
-              dataSource={unmatched.slice(0, 100).map((s, i) => ({ key: i, name: s }))}
-              columns={[{ title: "未匹配车系", dataIndex: "name", key: "name" }]}
-              size="small"
-              pagination={{ pageSize: 5 }}
-            />
-          </Card>
-        )}
-      </Result>
-    );
-  }
-
-  if (state === "error") {
-    return (
-      <Result
-        status="error"
-        title="上传失败"
-        extra={<Button type="primary" onClick={() => setState("idle")}>重试</Button>}
-      />
-    );
-  }
-
-  return (
-    <div>
-      <Dragger
-        accept=".xlsx,.xls"
-        maxCount={1}
-        beforeUpload={(file) => { uploadFile(file); return false; }}
-        showUploadList={false}
-        disabled={state === "uploading"}
-      >
-        <p className="ant-upload-drag-icon"><InboxOutlined /></p>
-        <p className="ant-upload-text">点击或拖拽车系映射表到此处上传</p>
-        <p className="ant-upload-hint">支持 .xlsx / .xls 格式</p>
-      </Dragger>
-      {state === "uploading" && (
-        <Card style={{ marginTop: 16 }}>
-          <Progress percent={progress} status="active" />
-          <p style={{ marginTop: 8, color: "#8c8c8c" }}>正在导入车系映射数据...</p>
-        </Card>
-      )}
-      <Card size="small" style={{ marginTop: 16 }}>
-        <p style={{ fontWeight: 500 }}>表格格式说明：</p>
-        <p style={{ color: "#8c8c8c", fontSize: 13 }}>
-          包含以下列：原始车系（必填）、标准车系、品牌<br />
-          系统会自动识别列名进行映射，上传后将覆盖所有现有车系映射数据。<br />
-          用于将底表中混乱的车系名称清洗为标准名称。
-        </p>
-      </Card>
-    </div>
-  );
-}
-
-/* ─────────── Main Page ─────────── */
 
 export default function MappingPage() {
-  const tabItems = [
-    {
-      key: "store",
-      label: <span><UploadOutlined /> 门店信息映射</span>,
-      children: <StoreMappingSection />,
-    },
-    {
-      key: "car-series",
-      label: <span><UploadOutlined /> 车系映射</span>,
-      children: <CarSeriesMappingSection />,
-    },
-  ];
-
-  return (
-    <div style={{ maxWidth: 900 }}>
-      <Card>
-        <Tabs defaultActiveKey="store" size="large" items={tabItems} />
-      </Card>
-    </div>
-  );
+  return <Card className="mapping-page-card"><Tabs defaultActiveKey="store" size="large" items={(Object.keys(LABELS) as MappingType[]).map((type) => ({ key: type, label: LABELS[type], children: <MappingEditor type={type} /> }))} /></Card>;
 }

@@ -10,6 +10,23 @@
   margin-bottom: 16px;
 }
 
+.store-analysis-sticky-toolbar {
+  position: sticky;
+  top: -16px;
+  z-index: 25;
+  margin: -16px -16px 16px;
+  padding: 14px 16px 12px;
+  background: rgba(245, 247, 250, 0.97);
+  border-bottom: 1px solid #e8e8e8;
+  backdrop-filter: blur(8px);
+}
+
+.store-tags-cell {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 .store-analysis-heading h1 {
   margin: 0;
   color: #262626;

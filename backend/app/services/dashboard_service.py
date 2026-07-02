@@ -402,6 +402,14 @@ def apply_moving_metrics(daily: list[dict]) -> None:
         sum_leads = sum(d["leads"] for d in window)
         sum_contacted = sum(d["contacted"] for d in window)
         sum_deals = sum(d["deals"] for d in window)
+        day_count = len(window)
+
+        item["leads_ma7"] = round(sum_leads / day_count, 2)
+        item["contacted_ma7"] = round(sum_contacted / day_count, 2)
+        item["deals_ma7"] = round(sum_deals / day_count, 2)
+        item["contact_rate_ma7"] = (
+            round(sum_contacted / sum_leads, 4) if sum_leads > 0 else 0.0
+        )
 
         if sum_leads > 0:
             item["delivery_penetration_ma7"] = round(sum_deals / sum_leads, 4)

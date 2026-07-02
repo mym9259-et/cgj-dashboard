@@ -48,9 +48,12 @@ export type SeriesSalespersonMetrics = {
 export type SalespersonStoreMetrics = {
   salesperson: string;
   first_record_date: string | null;
+  last_record_date: string | null;
+  stores: string[];
   deliveries: number;
   contacted: number;
   deals: number;
+  total_revenue: number;
   contact_penetration: number;
   avg_deal_amount: number;
   wuyou_five_year_ratio: number;
@@ -62,8 +65,9 @@ export type SalespersonStoreMetrics = {
 };
 
 export type SalespersonTrendMetricKey =
-  | "deliveries" | "contacted" | "deals" | "total_revenue"
-  | "contact_rate" | "contact_penetration" | "contact_penetration_ma7"
+  | "deliveries" | "deliveries_ma7" | "contacted" | "contacted_ma7"
+  | "deals" | "deals_ma7" | "total_revenue"
+  | "contact_rate" | "contact_rate_ma7" | "contact_penetration" | "contact_penetration_ma7"
   | "delivery_penetration" | "avg_deal_amount" | "wuyou_five_year_ratio";
 
 export type SalespersonTrendItem = {
@@ -72,8 +76,12 @@ export type SalespersonTrendItem = {
   deliveries: number;
   contacted: number;
   deals: number;
+  deliveries_ma7: number;
+  contacted_ma7: number;
+  deals_ma7: number;
   total_revenue: number;
   contact_rate: number;
+  contact_rate_ma7: number;
   contact_penetration: number;
   contact_penetration_ma7: number;
   delivery_penetration: number;
@@ -88,6 +96,11 @@ export type StoreSalespeople = {
   summary: SalespersonStoreMetrics;
   items: SalespersonStoreMetrics[];
   trend: SalespersonTrendItem[];
+};
+
+export type PeopleAnalysisData = {
+  summary: SalespersonStoreMetrics;
+  items: SalespersonStoreMetrics[];
 };
 
 export type StoreAnalysisData = {

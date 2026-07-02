@@ -1,5 +1,5 @@
 import { Grid, Layout } from "antd";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import SideMenu from "./SideMenu";
 import HeaderBar from "./HeaderBar";
@@ -11,9 +11,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [desktopCollapsed, setDesktopCollapsed] = useState(false);
   const screens = Grid.useBreakpoint();
   const location = useLocation();
-  const showGlobalFilters = location.pathname !== "/store-analysis";
+  const previousPath = useRef(location.pathname);
+  const showGlobalFilters = !["/store-analysis", "/people-analysis/individual", "/mapping", "/upload"].includes(location.pathname);
   const isNarrow = screens.md === false;
   const collapsed = isNarrow || desktopCollapsed;
+
+  useEffect(() => {
+    const previous = previousPath.current;
+    sessionStorage.setItem(`cgj-scroll-v1:${previous}`, String(window.scrollY));
+    previousPath.current = location.pathname;
+    const saved = Number(sessionStorage.getItem(`cgj-scroll-v1:${location.pathname}`) || 0);
+    requestAnimationFrame(() => window.scrollTo({ top: saved }));
+  }, [location.pathname]);
 
   return (
     <Layout style={{ minHeight: "100vh" }}>
@@ -59,7 +68,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       </Sider>
       <Layout>
-        {showGlobalFilters ? <HeaderBar /> : null}
+        {showGlobalFilters ? <div className="sticky-global-filters"><HeaderBar /></div> : null}
         <Content style={{ margin: isNarrow ? 10 : 16, overflow: "auto" }}>
           {children}
         </Content>

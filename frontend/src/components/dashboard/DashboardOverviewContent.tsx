@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   Button,
   Card,
@@ -16,9 +16,9 @@ import { formatCurrency, formatPercent } from "../../utils/formatters";
 import type { DashboardOverview, TrendItem } from "../../types/dashboard";
 
 type MetricKey =
-  | "leads" | "contacted" | "deals" | "revenue"
+  | "leads" | "leads_ma7" | "contacted" | "contacted_ma7" | "deals" | "deals_ma7" | "revenue"
   | "delivery_penetration" | "contact_penetration" | "contact_rate"
-  | "delivery_penetration_ma7" | "contact_penetration_ma7"
+  | "delivery_penetration_ma7" | "contact_penetration_ma7" | "contact_rate_ma7"
   | "a_series_ratio" | "a_series_ratio_ma7"
   | "a_series_contact_penetration" | "a_series_contact_penetration_ma7"
   | "b_series_ratio" | "b_series_ratio_ma7"
@@ -41,18 +41,26 @@ const SCALE_OPTIONS: { label: string; value: MetricKey }[] = [
   { label: "交付渗透率 MA7", value: "delivery_penetration_ma7" },
   { label: "触客渗透率 MA7", value: "contact_penetration_ma7" },
   { label: "触客率", value: "contact_rate" },
+  { label: "交付数 MA7", value: "leads_ma7" },
+  { label: "触客数 MA7", value: "contacted_ma7" },
+  { label: "成交数 MA7", value: "deals_ma7" },
+  { label: "触客率 MA7", value: "contact_rate_ma7" },
 ];
 
 const METRIC_LABEL: Record<MetricKey, string> = {
   leads: "交付数",
+  leads_ma7: "交付数 MA7",
   contacted: "触客数",
+  contacted_ma7: "触客数 MA7",
   deals: "成交数",
+  deals_ma7: "成交数 MA7",
   revenue: "销售额",
   delivery_penetration: "交付渗透率",
   contact_penetration: "触客渗透率",
   delivery_penetration_ma7: "交付渗透率 MA7",
   contact_penetration_ma7: "触客渗透率 MA7",
   contact_rate: "触客率",
+  contact_rate_ma7: "触客率 MA7",
   a_series_ratio: "A系占比", a_series_ratio_ma7: "A系占比 MA7",
   a_series_contact_penetration: "A系触客渗透率", a_series_contact_penetration_ma7: "A系触客渗透率 MA7",
   b_series_ratio: "B系占比", b_series_ratio_ma7: "B系占比 MA7",
@@ -68,7 +76,7 @@ const METRIC_LABEL: Record<MetricKey, string> = {
 };
 
 const PERCENT_METRICS = new Set<MetricKey>([
-  "delivery_penetration", "contact_penetration", "contact_rate",
+  "delivery_penetration", "contact_penetration", "contact_rate", "contact_rate_ma7",
   "delivery_penetration_ma7", "contact_penetration_ma7",
   "a_series_ratio", "a_series_ratio_ma7", "a_series_contact_penetration", "a_series_contact_penetration_ma7",
   "b_series_ratio", "b_series_ratio_ma7", "b_series_contact_penetration", "b_series_contact_penetration_ma7",
@@ -101,7 +109,15 @@ const STRUCTURE_ROWS: MatrixRow[] = [
   { label: "Lafa", ratio: "lafa_series_ratio", ratioMa7: "lafa_series_ratio_ma7", penetration: "lafa_series_contact_penetration", penetrationMa7: "lafa_series_contact_penetration_ma7" },
 ];
 
-function buildTrendOption(selected: MetricKey[], trend: TrendItem[], benchmark?: number) {
+function buildTrendOption(selected: MetricKey[], trend: TrendItem[], benchmark?: number, dayContext?: Record<string, string[]>) {
+  const days = trend.map((item) => item.day);
+  const activityStores = [...new Set(Object.values(dayContext || {}).flat())];
+  const hasActivity = activityStores.length > 0;
+  const storeColor = (store: string) => {
+    let hash = 0;
+    for (const char of store) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+    return ["#1677ff", "#13a8a8", "#722ed1", "#d48806", "#cf1322", "#389e0d", "#08979c", "#c41d7f"][hash % 8];
+  };
   const hasPercent = selected.some((metric) => PERCENT_METRICS.has(metric));
   const hasCount = selected.some((metric) => !PERCENT_METRICS.has(metric) && !["revenue", "wuyou_avg_deal_amount"].includes(metric));
   const hasRevenue = selected.some((metric) => ["revenue", "wuyou_avg_deal_amount"].includes(metric));
@@ -110,14 +126,30 @@ function buildTrendOption(selected: MetricKey[], trend: TrendItem[], benchmark?:
   if (hasCount || hasRevenue) {
     yAxis.push({
       type: "value",
+      gridIndex: hasActivity ? 1 : 0,
       name: "数量/金额",
       axisLabel: { formatter: (value: number) => hasRevenue ? `${(value / 10000).toFixed(0)}w` : value.toString() },
     });
   }
   if (hasPercent) {
-    yAxis.push({ type: "value", name: "比率", axisLabel: { formatter: (value: number) => `${(value * 100).toFixed(0)}%` } });
+    yAxis.push({ type: "value", gridIndex: hasActivity ? 1 : 0, name: "比率", axisLabel: { formatter: (value: number) => `${(value * 100).toFixed(0)}%` } });
   }
-  if (yAxis.length === 0) yAxis.push({ type: "value" });
+  if (yAxis.length === 0) yAxis.push({ type: "value", gridIndex: hasActivity ? 1 : 0 });
+  const metricAxisCount = yAxis.length;
+  if (hasActivity) yAxis.unshift({ type: "value", gridIndex: 0, show: false, min: 0, max: Math.max(1, ...days.map((day) => dayContext?.[day]?.length || 0)) });
+
+  const activitySeries = hasActivity ? activityStores.map((store) => ({
+    id: `activity:${store}`,
+    name: store,
+    type: "bar",
+    xAxisIndex: 0,
+    yAxisIndex: 0,
+    stack: "store-activity",
+    barWidth: "86%",
+    data: days.map((day) => dayContext?.[day]?.includes(store) ? 1 : 0),
+    itemStyle: { color: storeColor(store) },
+    emphasis: { disabled: true },
+  })) : [];
 
   return {
     tooltip: {
@@ -125,7 +157,10 @@ function buildTrendOption(selected: MetricKey[], trend: TrendItem[], benchmark?:
       formatter: (params: any) => {
         const items = Array.isArray(params) ? params : [params];
         let html = `<strong>${items[0]?.axisValue || ""}</strong><br/>`;
+        const stores = dayContext?.[String(items[0]?.axisValue || "")];
+        if (stores?.length) html += `门店：${stores.join("、")}<br/>`;
         for (const item of items) {
+          if (String(item.seriesId || "").startsWith("activity:")) continue;
           const value = PERCENT_METRICS.has(item.seriesId as MetricKey)
             ? `${(item.value * 100).toFixed(2)}%`
             : item.value?.toLocaleString() ?? "-";
@@ -135,17 +170,30 @@ function buildTrendOption(selected: MetricKey[], trend: TrendItem[], benchmark?:
       },
     },
     legend: { data: selected.map((metric) => METRIC_LABEL[metric]), bottom: 0, type: "scroll" as const },
-    grid: { left: 60, right: 60, top: 20, bottom: 50, containLabel: true },
-    xAxis: { type: "category", data: trend.map((item) => item.day), axisLabel: { rotate: 45, fontSize: 10 } },
+    graphic: hasActivity ? [{ type: "text", left: 72, top: 5, style: { text: "门店活动", fill: "#595959", fontSize: 11, fontWeight: 600 } }] : undefined,
+    grid: hasActivity
+      ? [
+          { left: 72, right: 72, top: 24, height: 18, containLabel: false },
+          { left: 72, right: 72, top: 88, bottom: 78, containLabel: false },
+        ]
+      : { left: 60, right: 60, top: 52, bottom: 78, containLabel: true },
+    xAxis: hasActivity
+      ? [
+          { type: "category", gridIndex: 0, data: days, boundaryGap: true, axisLabel: { show: false }, axisTick: { show: false }, axisLine: { show: false } },
+          { type: "category", gridIndex: 1, data: days, boundaryGap: true, axisLabel: { rotate: 45, fontSize: 10 } },
+        ]
+      : { type: "category", data: days, axisLabel: { rotate: 45, fontSize: 10 } },
     yAxis,
-    series: selected.map((metric, index) => {
+    dataZoom: [{ type: "inside", xAxisIndex: hasActivity ? [0, 1] : [0], start: 0, end: 100, moveOnMouseMove: true }, { type: "slider", xAxisIndex: hasActivity ? [0, 1] : [0], height: 18, bottom: 26 }],
+    series: [...activitySeries, ...selected.map((metric, index) => {
       const isPercent = PERCENT_METRICS.has(metric);
       const isMovingAverage = metric.includes("_ma");
       return {
         id: metric,
         name: METRIC_LABEL[metric],
         type: "line",
-        yAxisIndex: isPercent ? (yAxis.length > 1 ? 1 : 0) : 0,
+        xAxisIndex: hasActivity ? 1 : 0,
+        yAxisIndex: (isPercent ? (metricAxisCount > 1 ? 1 : 0) : 0) + (hasActivity ? 1 : 0),
         data: trend.map((item) => item[metric as keyof TrendItem]),
         smooth: isMovingAverage,
         showSymbol: false,
@@ -159,7 +207,7 @@ function buildTrendOption(selected: MetricKey[], trend: TrendItem[], benchmark?:
           data: [{ yAxis: benchmark }],
         } : undefined,
       };
-    }),
+    })],
   };
 }
 
@@ -188,10 +236,11 @@ function SeriesRatioCard({ title, ratio, count, contactPenetration }: SeriesRati
 function StructureMetricSelector({ value, onChange }: { value: MetricKey[]; onChange: (value: MetricKey[]) => void }) {
   const toggle = (metric: MetricKey, checked: boolean) => {
     if (checked) onChange([...value, metric]);
-    else if (value.length > 1) onChange(value.filter((item) => item !== metric));
+    else onChange(value.filter((item) => item !== metric));
   };
   const content = (
     <div className="structure-metric-grid">
+      <div className="metric-grid-actions"><Button size="small" type="link" onClick={() => onChange(STRUCTURE_ROWS.flatMap((row) => MATRIX_COLUMNS.map((column) => row[column.key]).filter(Boolean) as MetricKey[]).concat(["wuyou_five_year_ratio", "wuyou_avg_deal_amount"]))}>全选</Button><Button size="small" type="link" onClick={() => onChange([])}>清除</Button></div>
       <strong>车系</strong>
       {MATRIX_COLUMNS.map((column) => <strong key={column.key}>{column.label}</strong>)}
       {STRUCTURE_ROWS.flatMap((row) => [
@@ -199,7 +248,7 @@ function StructureMetricSelector({ value, onChange }: { value: MetricKey[]; onCh
         ...MATRIX_COLUMNS.map((column) => {
           const metric = row[column.key];
           return metric ? <Checkbox key={`${row.label}-${column.key}`} checked={value.includes(metric)}
-            disabled={value.length === 1 && value.includes(metric)} onChange={(event) => toggle(metric, event.target.checked)} />
+            onChange={(event) => toggle(metric, event.target.checked)} />
             : <span key={`${row.label}-${column.key}`}>-</span>;
         }),
       ])}
@@ -214,9 +263,31 @@ function StructureMetricSelector({ value, onChange }: { value: MetricKey[]; onCh
   </Popover>;
 }
 
-export function DashboardOverviewContent({ data, betweenTrends }: { data: DashboardOverview; betweenTrends?: ReactNode }) {
-  const [scaleMetrics, setScaleMetrics] = useState<MetricKey[]>(DEFAULT_SCALE_METRICS);
-  const [structureMetrics, setStructureMetrics] = useState<MetricKey[]>(DEFAULT_STRUCTURE_METRICS);
+function ScaleMetricSelector({ value, onChange }: { value: MetricKey[]; onChange: (value: MetricKey[]) => void }) {
+  const rows: Array<{ label: string; normal?: MetricKey; ma7?: MetricKey }> = [
+    { label: "交付数", normal: "leads", ma7: "leads_ma7" },
+    { label: "触客数", normal: "contacted", ma7: "contacted_ma7" },
+    { label: "成交数", normal: "deals", ma7: "deals_ma7" },
+    { label: "触客率", normal: "contact_rate", ma7: "contact_rate_ma7" },
+    { label: "交付渗透率", normal: "delivery_penetration", ma7: "delivery_penetration_ma7" },
+    { label: "触客渗透率", normal: "contact_penetration", ma7: "contact_penetration_ma7" },
+    { label: "销售额", normal: "revenue" },
+  ];
+  const toggle = (metric: MetricKey, checked: boolean) => onChange(checked ? [...new Set([...value, metric])] : value.filter((item) => item !== metric));
+  return <Popover trigger="click" placement="bottomRight" content={<div className="scale-metric-grid">
+    <div className="metric-grid-actions"><Button size="small" type="link" onClick={() => onChange(SCALE_OPTIONS.map((item) => item.value))}>全选</Button><Button size="small" type="link" onClick={() => onChange([])}>清除</Button></div>
+    <strong>指标</strong><strong>正常值</strong><strong>MA7</strong>
+    {rows.flatMap((row) => [<span key={`${row.label}-label`}>{row.label}</span>,
+      row.normal ? <Checkbox key={`${row.label}-normal`} checked={value.includes(row.normal)} onChange={(event) => toggle(row.normal!, event.target.checked)} /> : <span key={`${row.label}-normal`}>-</span>,
+      row.ma7 ? <Checkbox key={`${row.label}-ma7`} checked={value.includes(row.ma7)} onChange={(event) => toggle(row.ma7!, event.target.checked)} /> : <span key={`${row.label}-ma7`}>-</span>])}
+  </div>}><Button size="small" icon={<AppstoreOutlined />}>趋势指标 {value.length}</Button></Popover>;
+}
+
+export function DashboardOverviewContent({ data, beforeTrends, betweenTrends, cacheKey = "dashboard", dayContext, showKpis = true, showTrends = true }: { data: DashboardOverview; beforeTrends?: ReactNode; betweenTrends?: ReactNode; cacheKey?: string; dayContext?: Record<string, string[]>; showKpis?: boolean; showTrends?: boolean }) {
+  const saved = (() => { try { return JSON.parse(sessionStorage.getItem(`cgj-trend-state-v1:${cacheKey}`) || "{}"); } catch { return {}; } })();
+  const [scaleMetrics, setScaleMetrics] = useState<MetricKey[]>(saved.scaleMetrics || DEFAULT_SCALE_METRICS);
+  const [structureMetrics, setStructureMetrics] = useState<MetricKey[]>(saved.structureMetrics || DEFAULT_STRUCTURE_METRICS);
+  useEffect(() => { sessionStorage.setItem(`cgj-trend-state-v1:${cacheKey}`, JSON.stringify({ scaleMetrics, structureMetrics })); }, [cacheKey, scaleMetrics, structureMetrics]);
   const { kpis, trend } = data;
   const penColor = (value: number, threshold: number) => value >= threshold ? "#52c41a" : "#faad14";
   const benchmarkKey = structureMetrics.length === 1
@@ -228,6 +299,7 @@ export function DashboardOverviewContent({ data, betweenTrends }: { data: Dashbo
 
   return (
     <div>
+      {showKpis ? <>
       <div className="overview-kpi-grid">
         <Card size="small" className="kpi-card"><Statistic title="总交付" value={kpis.total_leads} /></Card>
         <Card size="small" className="kpi-card"><Statistic title="触客数" value={kpis.contacted_count} /></Card>
@@ -250,14 +322,15 @@ export function DashboardOverviewContent({ data, betweenTrends }: { data: Dashbo
         <Col xs={24} sm={12} md={8} xl={4}><SeriesRatioCard title="Lafa" ratio={kpis.lafa_series_ratio} count={kpis.lafa_series_count} contactPenetration={kpis.lafa_series_contact_penetration} /></Col>
         <Col xs={24} sm={12} md={8} xl={4}><SeriesRatioCard title="其他" ratio={kpis.other_series_ratio} count={kpis.other_series_count} contactPenetration={kpis.other_series_contact_penetration} /></Col>
       </Row>
+      </> : null}
+
+      {showTrends ? <>
+      {beforeTrends}
 
       <Card title="规模与漏斗趋势" style={{ marginTop: 16 }} extra={
-        <Select mode="multiple" size="small" style={{ width: 360, maxWidth: "50vw" }} value={scaleMetrics}
-          onChange={(value) => setScaleMetrics(value.length > 0 ? value : ["leads"])} options={SCALE_OPTIONS}
-          showSearch optionFilterProp="label" maxTagCount="responsive" listHeight={280}
-          popupMatchSelectWidth={360} placeholder="搜索并选择规模指标" />
+        <ScaleMetricSelector value={scaleMetrics} onChange={setScaleMetrics} />
       }>
-        <div className="chart-container"><ReactECharts option={buildTrendOption(scaleMetrics, trend)} style={{ height: 400 }} notMerge /></div>
+        <div className="chart-container">{scaleMetrics.length ? <ReactECharts option={buildTrendOption(scaleMetrics, trend, undefined, dayContext)} style={{ height: 400 }} notMerge /> : <div className="chart-empty">请选择趋势指标</div>}</div>
       </Card>
 
       {betweenTrends}
@@ -265,8 +338,9 @@ export function DashboardOverviewContent({ data, betweenTrends }: { data: Dashbo
       <Card title="车系交付结构趋势" style={{ marginTop: 16 }} extra={
         <StructureMetricSelector value={structureMetrics} onChange={setStructureMetrics} />
       }>
-        <div className="chart-container"><ReactECharts option={buildTrendOption(structureMetrics, trend, benchmark)} style={{ height: 400 }} notMerge /></div>
+        <div className="chart-container">{structureMetrics.length ? <ReactECharts option={buildTrendOption(structureMetrics, trend, benchmark)} style={{ height: 400 }} notMerge /> : <div className="chart-empty">请选择结构指标</div>}</div>
       </Card>
+      </> : null}
     </div>
   );
 }

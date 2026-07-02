@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 import type { FilterItem } from "../types/filter";
 
 interface FilterState {
@@ -16,7 +17,7 @@ interface FilterState {
   clearAll: () => void;
 }
 
-export const useFilterStore = create<FilterState>((set) => ({
+export const useFilterStore = create<FilterState>()(persist((set) => ({
   filters: [],
   filterLogic: "AND",
   startDate: null,
@@ -37,4 +38,4 @@ export const useFilterStore = create<FilterState>((set) => ({
   setDateRange: (start, end) => set({ startDate: start, endDate: end }),
   clearAll: () =>
     set({ filters: [], filterLogic: "AND", startDate: null, endDate: null }),
-}));
+}), { name: "cgj-global-filters-v1" }));

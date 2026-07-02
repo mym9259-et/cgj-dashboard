@@ -65,9 +65,12 @@ class SeriesSalespersonMetrics(BaseModel):
 class SalespersonStoreMetrics(BaseModel):
     salesperson: str
     first_record_date: date | None = None
+    last_record_date: date | None = None
+    stores: list[str] = []
     deliveries: int = 0
     contacted: int = 0
     deals: int = 0
+    total_revenue: float = 0.0
     contact_penetration: float = 0.0
     avg_deal_amount: float = 0.0
     wuyou_five_year_ratio: float = 0.0
@@ -84,8 +87,12 @@ class SalespersonTrendItem(BaseModel):
     deliveries: int = 0
     contacted: int = 0
     deals: int = 0
+    deliveries_ma7: float = 0.0
+    contacted_ma7: float = 0.0
+    deals_ma7: float = 0.0
     total_revenue: float = 0.0
     contact_rate: float = 0.0
+    contact_rate_ma7: float = 0.0
     contact_penetration: float = 0.0
     contact_penetration_ma7: float = 0.0
     delivery_penetration: float = 0.0
@@ -100,6 +107,11 @@ class StoreSalespeopleResponse(BaseModel):
     summary: SalespersonStoreMetrics
     items: list[SalespersonStoreMetrics]
     trend: list[SalespersonTrendItem]
+
+
+class PeopleAnalysisResponse(BaseModel):
+    summary: SalespersonStoreMetrics
+    items: list[SalespersonStoreMetrics]
 
 
 class StoreOptionsResponse(BaseModel):

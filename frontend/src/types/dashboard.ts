@@ -41,6 +41,10 @@ export interface TrendItem {
   deals: number;
   revenue: number;
   refunds: number;
+  leads_ma7: number;
+  contacted_ma7: number;
+  deals_ma7: number;
+  contact_rate_ma7: number;
   delivery_penetration: number;
   contact_penetration: number;
   contact_rate: number;

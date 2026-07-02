@@ -80,6 +80,9 @@ export default function UploadPage() {
       // Import
       store.setStep("importing");
       const result = await importData(uploadId, store.mapping);
+      Object.keys(sessionStorage)
+        .filter((key) => key.startsWith("cgj-page-"))
+        .forEach((key) => sessionStorage.removeItem(key));
       setImportResult(result);
       setUnmatchedStores(result.unmatched_stores || []);
       setMappingCoverage(result.mapping_coverage ?? 0);

@@ -34,6 +34,10 @@ class DashboardServiceTest(unittest.IsolatedAsyncioTestCase):
         apply_moving_metrics(daily)
 
         self.assertEqual(daily[-1]["a_series_ratio_ma7"], 0.1)
+        self.assertEqual(daily[-1]["leads_ma7"], 5.0)
+        self.assertEqual(daily[-1]["contacted_ma7"], 5.0)
+        self.assertEqual(daily[-1]["deals_ma7"], 0.0)
+        self.assertEqual(daily[-1]["contact_rate_ma7"], 1.0)
 
     def test_global_date_range_filters_delivery_date(self):
         clauses, _ = _build_where_clauses(

@@ -5,5 +5,7 @@ from app.models.lead import Lead
 from app.models.field_mapping import FieldMapping
 from app.models.filter_preset import FilterPreset
 from app.models.auth_user import AuthUser
+from app.models.personnel_mapping import PersonnelMapping
+from app.models.mapping_metadata import MappingMetadata
 
-__all__ = ["StoreMapping", "UploadBatch", "Lead", "FieldMapping", "FilterPreset", "CarSeriesMapping", "AuthUser"]
+__all__ = ["StoreMapping", "UploadBatch", "Lead", "FieldMapping", "FilterPreset", "CarSeriesMapping", "AuthUser", "PersonnelMapping", "MappingMetadata"]

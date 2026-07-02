@@ -4,7 +4,7 @@ from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api import auth, car_series, dashboard, export, filters, store, store_analysis, upload
+from app.api import auth, car_series, dashboard, export, filters, mapping_admin, store, store_analysis, upload
 from app.config import settings
 from app.core.exceptions import AppException
 from app.database import async_session, init_db
@@ -47,6 +47,7 @@ app.include_router(auth.router)
 app.include_router(upload.router, dependencies=protected)
 app.include_router(store.router, dependencies=protected)
 app.include_router(store_analysis.router, dependencies=protected)
+app.include_router(mapping_admin.router, dependencies=protected)
 app.include_router(dashboard.router, dependencies=protected)
 app.include_router(filters.router, dependencies=protected)
 app.include_router(car_series.router, dependencies=protected)

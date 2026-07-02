@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
+  Button,
   Card,
+  Checkbox,
   DatePicker,
   Empty,
   Segmented,
@@ -9,6 +11,7 @@ import {
   Spin,
   Table,
   Tag,
+  Popover,
 } from "antd";
 import {
   ArrowDownOutlined,
@@ -17,6 +20,7 @@ import {
 } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
 import type { Dayjs } from "dayjs";
+import dayjs from "dayjs";
 import ReactECharts from "echarts-for-react";
 import { getOverview } from "../api/dashboard";
 import {
@@ -26,6 +30,7 @@ import {
   searchStores,
 } from "../api/storeAnalysis";
 import { DashboardOverviewContent } from "../components/dashboard/DashboardOverviewContent";
+import { SalespersonMetricsTable } from "../components/analysis/SalespersonMetricsTable";
 import { useDebounce } from "../hooks/useDebounce";
 import type {
   PeriodMetricKey,
@@ -100,14 +105,14 @@ function ChangeValue({ value }: { value: number | null }) {
   );
 }
 
-function PeriodComparisonTable({ periods, loading }: { periods: StorePeriod[]; loading: boolean }) {
+export function PeriodComparisonTable({ periods, loading }: { periods: StorePeriod[]; loading: boolean }) {
   const columns = useMemo<ColumnsType<PeriodMetricDefinition>>(() => [
     {
       title: "经营指标",
       dataIndex: "label",
       key: "label",
       fixed: "left",
-      width: 190,
+      width: 142,
       render: (label: string, record) => (
         <span className={record.tone === "series-penetration" ? "series-penetration-label" : ""}>
           {label}
@@ -117,11 +122,13 @@ function PeriodComparisonTable({ periods, loading }: { periods: StorePeriod[]; l
     {
       title: "趋势",
       key: "trend",
-      width: 250,
+      width: 190,
       render: (_: unknown, metric: PeriodMetricDefinition) => {
         const values = periods.map((period) => period.metrics[metric.key]);
         const mean = values.length > 0 ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
-        return <div className="period-sparkline"><ReactECharts style={{ width: 220, height: 72 }} notMerge option={{
+        const formattedMean = ["deliveries", "contacted", "deals"].includes(metric.key)
+          ? Math.round(mean).toLocaleString() : formatMetric(mean, metric.format);
+        return <div className="period-sparkline"><ReactECharts style={{ width: 174, height: 68 }} notMerge option={{
           animation: false,
           grid: { left: 8, right: 8, top: 18, bottom: 6 },
           xAxis: { type: "category", show: false, data: periods.map((period) => period.label) },
@@ -132,7 +139,7 @@ function PeriodComparisonTable({ periods, loading }: { periods: StorePeriod[]; l
             lineStyle: { color: "#1677ff", width: 1.5 }, itemStyle: { color: "#1677ff" },
             label: { show: true, position: "top", fontSize: 9, color: "#595959", formatter: ({ value }: { value: number }) => formatMetric(value, metric.format) },
             markLine: { silent: true, symbol: "none", lineStyle: { color: "#8c8c8c", type: "dashed" },
-              label: { show: true, position: "insideEndTop", fontSize: 9, formatter: `均值 ${formatMetric(mean, metric.format)}` }, data: [{ yAxis: mean }] },
+              label: { show: true, position: "insideEndTop", fontSize: 9, formatter: `均值 ${formattedMean}` }, data: [{ yAxis: mean }] },
           }],
         }} /></div>;
       },
@@ -145,7 +152,7 @@ function PeriodComparisonTable({ periods, loading }: { periods: StorePeriod[]; l
         </div>
       ),
       key: period.key,
-      width: 150,
+      width: 116,
       align: "right" as const,
       render: (_: unknown, metric: PeriodMetricDefinition) => (
         <div className="period-value">
@@ -166,7 +173,7 @@ function PeriodComparisonTable({ periods, loading }: { periods: StorePeriod[]; l
       pagination={false}
       size="small"
       bordered
-      scroll={{ x: 440 + periods.length * 150 }}
+      scroll={{ x: 332 + periods.length * 116 }}
       rowClassName={(record) => record.tone === "series-ratio" ? "series-ratio-row" : ""}
       locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="该周期暂无数据" /> }}
     />
@@ -212,7 +219,10 @@ function ScorePanel({ data }: { data: StoreAnalysisData["score"] }) {
 const SALESPERSON_TREND_OPTIONS: { label: string; value: SalespersonTrendMetricKey; format: "number" | "percent" | "currency" }[] = [
   { label: "交付数", value: "deliveries", format: "number" }, { label: "触客数", value: "contacted", format: "number" },
   { label: "成交数", value: "deals", format: "number" }, { label: "销售额", value: "total_revenue", format: "currency" },
+  { label: "交付数 MA7", value: "deliveries_ma7", format: "number" }, { label: "触客数 MA7", value: "contacted_ma7", format: "number" },
+  { label: "成交数 MA7", value: "deals_ma7", format: "number" },
   { label: "触客率", value: "contact_rate", format: "percent" }, { label: "触客渗透率", value: "contact_penetration", format: "percent" },
+  { label: "触客率 MA7", value: "contact_rate_ma7", format: "percent" },
   { label: "触客渗透率 MA7", value: "contact_penetration_ma7", format: "percent" },
   { label: "交付渗透率", value: "delivery_penetration", format: "percent" },
   { label: "客单价", value: "avg_deal_amount", format: "currency" },
@@ -234,6 +244,28 @@ function buildSalespersonTrendChart(
     dataZoom: [{ type: "inside", start: 0, end: 100 }, { type: "slider", height: 18, bottom: 8 }],
     series: people.map((person) => ({ name: person, type: "line", showSymbol: false, smooth: metric.endsWith("ma7"), data: days.map((day) => valueMap.get(`${person}\u0000${day}`) ?? 0) })),
   };
+}
+
+function SalespersonMetricSelector({ value, onChange }: { value: SalespersonTrendMetricKey[]; onChange: (value: SalespersonTrendMetricKey[]) => void }) {
+  const rows: Array<{ label: string; normal?: SalespersonTrendMetricKey; ma7?: SalespersonTrendMetricKey }> = [
+    { label: "交付数", normal: "deliveries", ma7: "deliveries_ma7" },
+    { label: "触客数", normal: "contacted", ma7: "contacted_ma7" },
+    { label: "成交数", normal: "deals", ma7: "deals_ma7" },
+    { label: "触客率", normal: "contact_rate", ma7: "contact_rate_ma7" },
+    { label: "触客渗透率", normal: "contact_penetration", ma7: "contact_penetration_ma7" },
+    { label: "交付渗透率", normal: "delivery_penetration" },
+    { label: "销售额", normal: "total_revenue" },
+    { label: "客单价", normal: "avg_deal_amount" },
+    { label: "无忧5年期占比", normal: "wuyou_five_year_ratio" },
+  ];
+  const toggle = (metric: SalespersonTrendMetricKey, checked: boolean) => onChange(checked ? [...new Set([...value, metric])] : value.filter((item) => item !== metric));
+  return <Popover trigger="click" placement="bottomRight" content={<div className="scale-metric-grid">
+    <div className="metric-grid-actions"><Button size="small" type="link" onClick={() => onChange(SALESPERSON_TREND_OPTIONS.map((item) => item.value))}>全选</Button><Button size="small" type="link" onClick={() => onChange([])}>清除</Button></div>
+    <strong>指标</strong><strong>正常值</strong><strong>MA7</strong>
+    {rows.flatMap((row) => [<span key={`${row.label}-label`}>{row.label}</span>,
+      row.normal ? <Checkbox key={`${row.label}-normal`} checked={value.includes(row.normal)} onChange={(event) => toggle(row.normal!, event.target.checked)} /> : <span key={`${row.label}-normal`}>-</span>,
+      row.ma7 ? <Checkbox key={`${row.label}-ma7`} checked={value.includes(row.ma7)} onChange={(event) => toggle(row.ma7!, event.target.checked)} /> : <span key={`${row.label}-ma7`}>-</span>])}
+  </div>}><Button size="small">经营指标 {value.length}</Button></Popover>;
 }
 
 function HeatValue({ value, benchmark, format }: { value: number; benchmark: number; format: "percent" | "currency" }) {
@@ -279,21 +311,26 @@ function buildSalespersonColumns(summary: SalespersonStoreMetrics): ColumnsType<
 ] };
 
 export default function StoreAnalysisPage() {
-  const [storeName, setStoreName] = useState<string>();
-  const [dateRange, setDateRange] = useState<[Dayjs, Dayjs] | null>(null);
+  const cachedState = (() => { try { return JSON.parse(sessionStorage.getItem("cgj-store-analysis-state-v1") || "{}"); } catch { return {}; } })();
+  const [storeName, setStoreName] = useState<string | undefined>(cachedState.storeName);
+  const [dateRange, setDateRange] = useState<[Dayjs, Dayjs] | null>(cachedState.startDate && cachedState.endDate ? [dayjs(cachedState.startDate), dayjs(cachedState.endDate)] : null);
   const [storeKeyword, setStoreKeyword] = useState("");
   const debouncedKeyword = useDebounce(storeKeyword, 250);
   const [storeOptions, setStoreOptions] = useState<string[]>([]);
   const [storeOptionsLoading, setStoreOptionsLoading] = useState(false);
-  const [periodMode, setPeriodMode] = useState<"month" | "week">("month");
-  const [salespersonMetrics, setSalespersonMetrics] = useState<SalespersonTrendMetricKey[]>(["contact_penetration", "contact_penetration_ma7"]);
-  const [selectedSalespeople, setSelectedSalespeople] = useState<string[]>([]);
+  const [periodMode, setPeriodMode] = useState<"month" | "week">(cachedState.periodMode || "month");
+  const [salespersonMetrics, setSalespersonMetrics] = useState<SalespersonTrendMetricKey[]>(cachedState.salespersonMetrics || ["contact_penetration", "contact_penetration_ma7"]);
+  const [selectedSalespeople, setSelectedSalespeople] = useState<string[]>(cachedState.selectedSalespeople || []);
   const [data, setData] = useState<StoreAnalysisData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>();
 
   const startDate = dateRange?.[0].format("YYYY-MM-DD");
   const endDate = dateRange?.[1].format("YYYY-MM-DD");
+
+  useEffect(() => {
+    sessionStorage.setItem("cgj-store-analysis-state-v1", JSON.stringify({ storeName, startDate, endDate, periodMode, salespersonMetrics, selectedSalespeople }));
+  }, [storeName, startDate, endDate, periodMode, salespersonMetrics, selectedSalespeople]);
 
   useEffect(() => {
     let cancelled = false;
@@ -331,9 +368,8 @@ export default function StoreAnalysisPage() {
       .then(([score, monthly, weekly, overview, salespeople]) => {
         if (!cancelled) {
           setData({ score, monthly, weekly, overview, salespeople });
-          setSelectedSalespeople(
-            [...salespeople.items].sort((a, b) => b.contacted - a.contacted).slice(0, 5).map((item) => item.salesperson)
-          );
+          setSelectedSalespeople((current) => current.length > 0 ? current.filter((name) => salespeople.items.some((item) => item.salesperson === name)) :
+            [...salespeople.items].sort((a, b) => b.contacted - a.contacted).slice(0, 5).map((item) => item.salesperson));
         }
       })
       .catch(() => {
@@ -357,26 +393,25 @@ export default function StoreAnalysisPage() {
     <Card title="销售员经营趋势" style={{ marginTop: 16 }} extra={
       <div className="salesperson-trend-controls">
         <Select mode="multiple" size="small" value={selectedSalespeople} maxTagCount="responsive"
-          onChange={(value) => setSelectedSalespeople(value.length > 0 ? value : [data.salespeople.items[0]?.salesperson].filter(Boolean) as string[])}
+          onChange={setSelectedSalespeople}
           options={data.salespeople.items.map((item) => ({ label: item.salesperson, value: item.salesperson }))}
           placeholder="选择销售员" style={{ width: 300 }} />
-        <Select mode="multiple" size="small" value={salespersonMetrics} maxTagCount="responsive"
-          onChange={(value) => setSalespersonMetrics(value.length > 0 ? value : ["contact_penetration"])}
-          options={SALESPERSON_TREND_OPTIONS} placeholder="选择指标" style={{ width: 320 }} />
+        <div className="salesperson-quick-actions"><Button size="small" type="link" onClick={() => setSelectedSalespeople(data.salespeople.items.map((item) => item.salesperson))}>全选人员</Button><Button size="small" type="link" onClick={() => setSelectedSalespeople([])}>清除人员</Button></div>
+        <SalespersonMetricSelector value={salespersonMetrics} onChange={setSalespersonMetrics} />
       </div>
     }>
-      {data.salespeople.items.length > 0 ? <div className="salesperson-trend-grid">
+      {data.salespeople.items.length > 0 && selectedSalespeople.length > 0 && salespersonMetrics.length > 0 ? <div className="salesperson-trend-grid">
         {salespersonMetrics.map((metric) => <section key={metric} className="salesperson-trend-chart">
           <h3>{SALESPERSON_TREND_OPTIONS.find((item) => item.value === metric)?.label}</h3>
           <ReactECharts option={buildSalespersonTrendChart(data.salespeople.trend, selectedSalespeople, metric)} style={{ height: 330 }} notMerge />
         </section>)}
-      </div> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="该周期暂无销售员记录" />}
+      </div> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="请选择销售员和经营指标" />}
     </Card>
   ) : null;
 
   return (
     <div className="store-analysis-page">
-      <div className="store-analysis-heading">
+      <div className="store-analysis-heading store-analysis-sticky-toolbar">
         <div>
           <h1>门店分析</h1>
           {storeName ? <span>{storeName}</span> : null}
@@ -435,36 +470,11 @@ export default function StoreAnalysisPage() {
               <h2>周期经营透视</h2>
               <span>{startDate} 至 {endDate}</span>
             </div>
-            <DashboardOverviewContent data={data.overview} betweenTrends={salespersonTrendPanel} />
+            <DashboardOverviewContent data={data.overview} betweenTrends={salespersonTrendPanel} cacheKey="store-analysis" />
           </section>
 
           <Card title="销售员经营明细">
-            <Table
-              rowKey="salesperson"
-              columns={buildSalespersonColumns(data.salespeople.summary)}
-              dataSource={data.salespeople.items}
-              pagination={false}
-              size="small"
-              bordered
-              scroll={{ x: 1935 }}
-              summary={() => <Table.Summary fixed="top">
-                <Table.Summary.Row className="store-summary-row">
-                  <Table.Summary.Cell index={0}>门店汇总</Table.Summary.Cell>
-                  <Table.Summary.Cell index={1}>--</Table.Summary.Cell>
-                  <Table.Summary.Cell index={2} align="right">{data.salespeople.summary.deliveries}</Table.Summary.Cell>
-                  <Table.Summary.Cell index={3} align="right">{data.salespeople.summary.contacted}</Table.Summary.Cell>
-                  <Table.Summary.Cell index={4} align="right">{data.salespeople.summary.deals}</Table.Summary.Cell>
-                  <Table.Summary.Cell index={5} align="right">{formatPercent(data.salespeople.summary.contact_penetration, 1)}</Table.Summary.Cell>
-                  <Table.Summary.Cell index={6} align="right">{formatCurrency(data.salespeople.summary.avg_deal_amount)}</Table.Summary.Cell>
-                  <Table.Summary.Cell index={7} align="right">{formatPercent(data.salespeople.summary.wuyou_five_year_ratio, 1)}</Table.Summary.Cell>
-                  {SERIES_COLUMNS.flatMap((series, index) => [
-                    <Table.Summary.Cell key={`${series.key}-share`} index={8 + index * 2} align="right">{formatPercent(data.salespeople.summary[series.key].contact_share, 1)}</Table.Summary.Cell>,
-                    <Table.Summary.Cell key={`${series.key}-penetration`} index={9 + index * 2} align="right">{formatPercent(data.salespeople.summary[series.key].contact_penetration, 1)}</Table.Summary.Cell>,
-                  ])}
-                </Table.Summary.Row>
-              </Table.Summary>}
-              locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="该周期暂无销售员记录" /> }}
-            />
+            <SalespersonMetricsTable items={data.salespeople.items} summary={data.salespeople.summary} />
           </Card>
         </div>
       ) : null}
