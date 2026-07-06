@@ -114,5 +114,46 @@ class PeopleAnalysisResponse(BaseModel):
     items: list[SalespersonStoreMetrics]
 
 
+class StoreDailyTrend(BaseModel):
+    day: date
+    delivery_penetration: float = 0.0
+    contact_rate: float = 0.0
+    contact_penetration: float = 0.0
+
+
+class StoreOverviewItem(BaseModel):
+    store_name: str
+    store_manager: str | None = None
+    region: str | None = None
+    province: str | None = None
+    city: str | None = None
+    dealer_direct: str | None = None
+    store_mode: str | None = None
+    salesperson_count: int = 0
+    salespeople: list[str] = []
+    first_record_date: date | None = None
+    last_record_date: date | None = None
+    deliveries: int = 0
+    contacted: int = 0
+    deals: int = 0
+    total_revenue: float = 0.0
+    delivery_penetration: float = 0.0
+    contact_rate: float = 0.0
+    contact_penetration: float = 0.0
+    avg_deal_amount: float = 0.0
+    wuyou_five_year_ratio: float = 0.0
+    a_series: SeriesSalespersonMetrics
+    b_series: SeriesSalespersonMetrics
+    c_series: SeriesSalespersonMetrics
+    d_series: SeriesSalespersonMetrics
+    lafa_series: SeriesSalespersonMetrics
+    trend: list[StoreDailyTrend] = []
+
+
+class StoreOverviewResponse(BaseModel):
+    summary: StoreOverviewItem
+    items: list[StoreOverviewItem]
+
+
 class StoreOptionsResponse(BaseModel):
     stores: list[str]

@@ -101,6 +101,34 @@ body {
   color: #8c8c8c;
 }
 
+.clickable-tag {
+  cursor: pointer;
+}
+
+.clickable-tag:hover {
+  color: #0958d9;
+  border-color: #91caff;
+}
+
+.store-people-cell {
+  display: flex;
+  max-height: 64px;
+  gap: 4px;
+  overflow: auto;
+  flex-wrap: wrap;
+}
+
+.store-sparkline {
+  display: block;
+  width: 112px;
+  height: 34px;
+  color: #1677ff;
+}
+
+.sparkline-empty {
+  color: #bfbfbf;
+}
+
 .mapping-page-card {
   min-width: 0;
 }

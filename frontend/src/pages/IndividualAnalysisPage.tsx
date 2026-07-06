@@ -19,7 +19,11 @@ export default function IndividualAnalysisPage() {
   const [keyword, setKeyword] = useState("");
   const debouncedKeyword = useDebounce(keyword, 250);
   const [options, setOptions] = useState<string[]>([]);
-  const [range, setRange] = useState<[Dayjs, Dayjs]>([dayjs().subtract(2, "month").startOf("month"), dayjs()]);
+  const [range, setRange] = useState<[Dayjs, Dayjs]>(() => {
+    const start = params.get("start_date");
+    const end = params.get("end_date");
+    return start && end ? [dayjs(start), dayjs(end)] : [dayjs().subtract(2, "month").startOf("month"), dayjs()];
+  });
   const [mode, setMode] = useState<"month" | "week">("month");
   const [calendarValue, setCalendarValue] = useState<Dayjs>(dayjs());
   const [data, setData] = useState<any>(null);

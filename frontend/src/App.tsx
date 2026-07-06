@@ -7,6 +7,7 @@ import DashboardPage from "./pages/DashboardPage";
 import LoginPage from "./pages/LoginPage";
 import MappingPage from "./pages/MappingPage";
 import StoreAnalysisPage from "./pages/StoreAnalysisPage";
+import StoreOverviewPage from "./pages/StoreOverviewPage";
 import PeopleAnalysisPage from "./pages/PeopleAnalysisPage";
 import IndividualAnalysisPage from "./pages/IndividualAnalysisPage";
 import UploadPage from "./pages/UploadPage";
@@ -19,6 +20,7 @@ function ProtectedRoutes() {
         <Route path="/upload" element={<UploadPage />} />
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/store-analysis" element={<StoreAnalysisPage />} />
+        <Route path="/store-overview" element={<StoreOverviewPage />} />
         <Route path="/people-analysis" element={<PeopleAnalysisPage />} />
         <Route path="/people-analysis/individual" element={<IndividualAnalysisPage />} />
         <Route path="/compare" element={<ComparePage />} />

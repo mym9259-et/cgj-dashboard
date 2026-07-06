@@ -13,7 +13,10 @@ const menuItems = [
   { key: "/mapping", icon: <AuditOutlined />, label: "映射管理" },
   { key: "/upload", icon: <UploadOutlined />, label: "数据上传" },
   { key: "/dashboard", icon: <DashboardOutlined />, label: "概览看板" },
-  { key: "/store-analysis", icon: <ShopOutlined />, label: "门店分析" },
+  { key: "stores", icon: <ShopOutlined />, label: "门店分析", children: [
+    { key: "/store-overview", label: "门店总览" },
+    { key: "/store-analysis", label: "单店分析" },
+  ] },
   { key: "people", icon: <TeamOutlined />, label: "人员分析", children: [
     { key: "/people-analysis", label: "人员总览" },
     { key: "/people-analysis/individual", label: "个人分析" },
@@ -32,7 +35,7 @@ export default function SideMenu() {
       theme="dark"
       mode="inline"
       selectedKeys={[selectedKey]}
-      defaultOpenKeys={["people"]}
+      defaultOpenKeys={["stores", "people"]}
       items={menuItems}
       onClick={({ key }) => navigate(key)}
     />

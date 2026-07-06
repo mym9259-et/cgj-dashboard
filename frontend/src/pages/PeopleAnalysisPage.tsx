@@ -22,6 +22,12 @@ export default function PeopleAnalysisPage() {
   }), [debouncedFilters, debouncedLogic, debouncedStart, debouncedEnd]);
   const [data, setData] = useState<PeopleAnalysisData | null>(null);
   const [loading, setLoading] = useState(true);
+  const detailQuery = (extra: Record<string, string>) => {
+    const params = new URLSearchParams(extra);
+    if (debouncedStart) params.set("start_date", debouncedStart);
+    if (debouncedEnd) params.set("end_date", debouncedEnd);
+    return params.toString();
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -50,7 +56,9 @@ export default function PeopleAnalysisPage() {
     <Card title="销售员经营明细">
       {loading && !data ? <Spin size="large" style={{ display: "block", margin: "80px auto" }} />
         : data && data.items.length ? <SalespersonMetricsTable items={data.items} summary={data.summary}
-            showStores showLastRecordDate onPersonClick={(name) => navigate(`/people-analysis/individual?name=${encodeURIComponent(name)}`)} />
+            showStores showLastRecordDate
+            onPersonClick={(name) => navigate(`/people-analysis/individual?${detailQuery({ name })}`)}
+            onStoreClick={(store) => navigate(`/store-analysis?${detailQuery({ store })}`)} />
         : <Empty description="当前筛选范围内暂无销售员数据" />}
     </Card>
   </div>;

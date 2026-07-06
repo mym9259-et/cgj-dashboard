@@ -12,20 +12,21 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const screens = Grid.useBreakpoint();
   const location = useLocation();
   const previousPath = useRef(location.pathname);
+  const contentRef = useRef<HTMLDivElement>(null);
   const showGlobalFilters = !["/store-analysis", "/people-analysis/individual", "/mapping", "/upload"].includes(location.pathname);
   const isNarrow = screens.md === false;
   const collapsed = isNarrow || desktopCollapsed;
 
   useEffect(() => {
     const previous = previousPath.current;
-    sessionStorage.setItem(`cgj-scroll-v1:${previous}`, String(window.scrollY));
+    sessionStorage.setItem(`cgj-scroll-v1:${previous}`, String(contentRef.current?.scrollTop || 0));
     previousPath.current = location.pathname;
     const saved = Number(sessionStorage.getItem(`cgj-scroll-v1:${location.pathname}`) || 0);
-    requestAnimationFrame(() => window.scrollTo({ top: saved }));
+    requestAnimationFrame(() => contentRef.current?.scrollTo({ top: saved }));
   }, [location.pathname]);
 
   return (
-    <Layout style={{ minHeight: "100vh" }}>
+    <Layout style={{ height: "100vh", overflow: "hidden" }}>
       <Sider
         collapsible
         collapsed={collapsed}
@@ -33,7 +34,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         onCollapse={setDesktopCollapsed}
         trigger={isNarrow ? null : undefined}
         width={220}
-        style={{ boxShadow: "2px 0 8px rgba(0,0,0,0.06)" }}
+        style={{
+          position: "fixed",
+          inset: "0 auto 0 0",
+          zIndex: 40,
+          height: "100vh",
+          overflow: "auto",
+          boxShadow: "2px 0 8px rgba(0,0,0,0.06)",
+        }}
       >
         <div
           style={{
@@ -67,9 +75,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <UserMenu collapsed={collapsed} />
         </div>
       </Sider>
-      <Layout>
+      <Layout style={{ height: "100vh", marginLeft: collapsed ? 64 : 220, overflow: "hidden", transition: "margin-left 0.2s" }}>
         {showGlobalFilters ? <div className="sticky-global-filters"><HeaderBar /></div> : null}
-        <Content style={{ margin: isNarrow ? 10 : 16, overflow: "auto" }}>
+        <Content ref={contentRef} style={{ margin: isNarrow ? 10 : 16, overflow: "auto" }}>
           {children}
         </Content>
       </Layout>

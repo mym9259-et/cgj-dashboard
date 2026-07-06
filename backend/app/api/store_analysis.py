@@ -12,6 +12,7 @@ from app.database import get_db
 from app.models.lead import Lead
 from app.schemas.store_analysis import (
     StoreOptionsResponse,
+    StoreOverviewResponse,
     PeopleAnalysisResponse,
     StorePeriodComparison,
     StoreSalespeopleResponse,
@@ -20,6 +21,7 @@ from app.schemas.store_analysis import (
 from app.services.store_analysis_service import (
     get_period_comparison,
     get_people_analysis,
+    get_store_overview,
     get_person_profile,
     get_scope_period_comparison,
     get_salespeople_metrics,
@@ -90,6 +92,23 @@ async def people_analysis(
             db, filter_list, filter_logic, start_date, end_date
         )
     )
+
+
+@router.get("/overview", response_model=StoreOverviewResponse)
+async def store_overview(
+    filters: str | None = Query(None),
+    filter_logic: str = Query("AND", pattern="^(AND|OR)$"),
+    start_date: date | None = None,
+    end_date: date | None = None,
+    db: AsyncSession = Depends(get_db),
+):
+    return StoreOverviewResponse(**await get_store_overview(
+        db,
+        json.loads(filters) if filters else [],
+        filter_logic,
+        start_date,
+        end_date,
+    ))
 
 
 @router.get("/scope-period-comparison")

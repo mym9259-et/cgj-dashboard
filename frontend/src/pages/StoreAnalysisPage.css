@@ -70,6 +70,22 @@
   opacity: 0.72;
 }
 
+.store-profile-score-grid {
+  display: grid;
+  grid-template-columns: minmax(300px, 0.72fr) minmax(560px, 1.6fr);
+  gap: 16px;
+  align-items: stretch;
+}
+
+.store-profile-score-grid > .ant-card {
+  height: 100%;
+}
+
+.store-profile-card .ant-descriptions-item-label {
+  width: 124px;
+  color: #8c8c8c;
+}
+
 .score-layout {
   display: grid;
   grid-template-columns: minmax(160px, 0.36fr) minmax(360px, 1fr);
@@ -219,6 +235,9 @@
 }
 
 @media (max-width: 900px) {
+  .store-profile-score-grid {
+    grid-template-columns: 1fr;
+  }
   .store-analysis-heading {
     align-items: stretch;
     flex-direction: column;

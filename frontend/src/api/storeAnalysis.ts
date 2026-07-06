@@ -4,6 +4,7 @@ import type {
   StoreSalespeople,
   StoreScore,
   PeopleAnalysisData,
+  StoreOverviewData,
 } from "../types/storeAnalysis";
 import type { FilterItem } from "../types/filter";
 
@@ -54,6 +55,23 @@ export async function getPeopleAnalysis(
   endDate: string | null,
 ): Promise<PeopleAnalysisData> {
   const { data } = await apiClient.get("/store-analysis/people", {
+    params: {
+      filters: filters.length ? JSON.stringify(filters) : undefined,
+      filter_logic: filterLogic,
+      start_date: startDate || undefined,
+      end_date: endDate || undefined,
+    },
+  });
+  return data;
+}
+
+export async function getStoreOverview(
+  filters: FilterItem[],
+  filterLogic: "AND" | "OR",
+  startDate: string | null,
+  endDate: string | null,
+): Promise<StoreOverviewData> {
+  const { data } = await apiClient.get("/store-analysis/overview", {
     params: {
       filters: filters.length ? JSON.stringify(filters) : undefined,
       filter_logic: filterLogic,

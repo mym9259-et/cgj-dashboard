@@ -103,6 +103,47 @@ export type PeopleAnalysisData = {
   items: SalespersonStoreMetrics[];
 };
 
+export type StoreDailyTrend = {
+  day: string;
+  delivery_penetration: number;
+  contact_rate: number;
+  contact_penetration: number;
+};
+
+export type StoreOverviewItem = {
+  store_name: string;
+  store_manager: string | null;
+  region: string | null;
+  province: string | null;
+  city: string | null;
+  dealer_direct: string | null;
+  store_mode: string | null;
+  salesperson_count: number;
+  salespeople: string[];
+  first_record_date: string | null;
+  last_record_date: string | null;
+  deliveries: number;
+  contacted: number;
+  deals: number;
+  total_revenue: number;
+  delivery_penetration: number;
+  contact_rate: number;
+  contact_penetration: number;
+  avg_deal_amount: number;
+  wuyou_five_year_ratio: number;
+  a_series: SeriesSalespersonMetrics;
+  b_series: SeriesSalespersonMetrics;
+  c_series: SeriesSalespersonMetrics;
+  d_series: SeriesSalespersonMetrics;
+  lafa_series: SeriesSalespersonMetrics;
+  trend: StoreDailyTrend[];
+};
+
+export type StoreOverviewData = {
+  summary: StoreOverviewItem;
+  items: StoreOverviewItem[];
+};
+
 export type StoreAnalysisData = {
   score: StoreScore;
   monthly: StorePeriodComparison;

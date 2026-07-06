@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.constants import CONTACT_STATUS_REACHED, DEAL_STATUS_SUCCESS
 from app.models.lead import Lead
 from app.models.personnel_mapping import PersonnelMapping
+from app.models.store_mapping import StoreMapping
 from app.services.dashboard_service import (
     TREND_SERIES_GROUPS,
     _apply_clauses,
@@ -725,4 +726,167 @@ async def get_people_analysis(
         }
 
     items.sort(key=lambda item: (-item["deals"], -item["deliveries"], item["salesperson"]))
+    return {"summary": summary, "items": items}
+
+
+async def get_store_overview(
+    db: AsyncSession,
+    filters: list[dict] | None,
+    filter_logic: str,
+    start_date: date | None,
+    end_date: date | None,
+) -> dict:
+    """Aggregate store operating metrics inside the active dashboard scope."""
+    clauses, _ = _build_where_clauses(filters, filter_logic, start_date, end_date)
+    clauses.extend([Lead.merchant_name.isnot(None), Lead.merchant_name != ""])
+
+    series_contact_columns = [
+        func.count().filter(
+            _series_group_condition(series),
+            Lead.contact_status == CONTACT_STATUS_REACHED,
+        ).label(f"{key}_contacted")
+        for key, series in TREND_SERIES_GROUPS.items()
+    ]
+    series_deal_columns = [
+        func.count().filter(
+            _series_group_condition(series),
+            Lead.deal_status == DEAL_STATUS_SUCCESS,
+        ).label(f"{key}_deals")
+        for key, series in TREND_SERIES_GROUPS.items()
+    ]
+    base = (
+        select(
+            Lead.merchant_name.label("store_name"),
+            func.max(StoreMapping.store_manager).label("store_manager"),
+            func.max(StoreMapping.lingpao_region).label("region"),
+            func.max(StoreMapping.province).label("province"),
+            func.max(StoreMapping.city).label("city"),
+            func.max(StoreMapping.dealer_direct).label("dealer_direct"),
+            func.max(StoreMapping.store_mode).label("store_mode"),
+            func.max(Lead.delivery_date).label("last_record_date"),
+            func.count().label("deliveries"),
+            func.count().filter(Lead.contact_status == CONTACT_STATUS_REACHED).label("contacted"),
+            func.count().filter(Lead.deal_status == DEAL_STATUS_SUCCESS).label("deals"),
+            func.coalesce(func.sum(Lead.deal_amount).filter(Lead.deal_status == DEAL_STATUS_SUCCESS), 0).label("total_revenue"),
+            func.count().filter(Lead.deal_status == DEAL_STATUS_SUCCESS, Lead.product_type == "无忧产品").label("wuyou_deals"),
+            func.count().filter(Lead.deal_status == DEAL_STATUS_SUCCESS, Lead.product_type == "无忧产品", Lead.product_years.in_(["5"])).label("wuyou_five_year_deals"),
+            *series_contact_columns,
+            *series_deal_columns,
+        )
+        .select_from(Lead)
+        .outerjoin(StoreMapping, Lead.merchant_name == StoreMapping.merchant_name)
+    )
+    rows = (await db.execute(_apply_clauses(base, clauses).group_by(Lead.merchant_name))).all()
+    store_names = [row.store_name for row in rows]
+
+    first_dates: dict[str, date] = {}
+    salespeople: dict[str, list[str]] = {name: [] for name in store_names}
+    if store_names:
+        first_rows = await db.execute(
+            select(Lead.merchant_name, func.min(Lead.delivery_date))
+            .where(Lead.merchant_name.in_(store_names), Lead.delivery_date.isnot(None))
+            .group_by(Lead.merchant_name)
+        )
+        first_dates = {row[0]: row[1] for row in first_rows.all()}
+
+        people_stmt = select(Lead.merchant_name, Lead.salesperson).select_from(Lead).outerjoin(
+            StoreMapping, Lead.merchant_name == StoreMapping.merchant_name
+        )
+        people_stmt = _apply_clauses(people_stmt, clauses).where(
+            Lead.salesperson.isnot(None), Lead.salesperson != ""
+        ).distinct()
+        for store_name, salesperson in (await db.execute(people_stmt)).all():
+            salespeople.setdefault(store_name, []).append(salesperson)
+
+    daily_stmt = select(
+        Lead.merchant_name.label("store_name"),
+        Lead.delivery_date.label("day"),
+        func.count().label("deliveries"),
+        func.count().filter(Lead.contact_status == CONTACT_STATUS_REACHED).label("contacted"),
+        func.count().filter(Lead.deal_status == DEAL_STATUS_SUCCESS).label("deals"),
+    ).select_from(Lead).outerjoin(StoreMapping, Lead.merchant_name == StoreMapping.merchant_name)
+    daily_rows = (await db.execute(
+        _apply_clauses(daily_stmt, [*clauses, Lead.delivery_date.isnot(None)])
+        .group_by(Lead.merchant_name, Lead.delivery_date)
+        .order_by(Lead.merchant_name, Lead.delivery_date)
+    )).all()
+    trends: dict[str, list[dict]] = {name: [] for name in store_names}
+    for row in daily_rows:
+        trends.setdefault(row.store_name, []).append({
+            "day": row.day,
+            "delivery_penetration": _safe_ratio(row.deals or 0, row.deliveries or 0),
+            "contact_rate": _safe_ratio(row.contacted or 0, row.deliveries or 0),
+            "contact_penetration": _safe_ratio(row.deals or 0, row.contacted or 0),
+        })
+
+    items = []
+    total_series = {key: {"contacted": 0, "deals": 0} for key in TREND_SERIES_GROUPS}
+    for row in rows:
+        deliveries = row.deliveries or 0
+        contacted = row.contacted or 0
+        deals = row.deals or 0
+        revenue = float(row.total_revenue or 0)
+        names = sorted(salespeople.get(row.store_name, []))
+        item = {
+            "store_name": row.store_name,
+            "store_manager": row.store_manager,
+            "region": row.region,
+            "province": row.province,
+            "city": row.city,
+            "dealer_direct": row.dealer_direct,
+            "store_mode": row.store_mode,
+            "salesperson_count": len(names),
+            "salespeople": names,
+            "first_record_date": first_dates.get(row.store_name),
+            "last_record_date": row.last_record_date,
+            "deliveries": deliveries,
+            "contacted": contacted,
+            "deals": deals,
+            "total_revenue": round(revenue, 2),
+            "delivery_penetration": _safe_ratio(deals, deliveries),
+            "contact_rate": _safe_ratio(contacted, deliveries),
+            "contact_penetration": _safe_ratio(deals, contacted),
+            "avg_deal_amount": round(revenue / deals, 2) if deals else 0.0,
+            "wuyou_five_year_ratio": _safe_ratio(row.wuyou_five_year_deals or 0, row.wuyou_deals or 0),
+            "trend": trends.get(row.store_name, []),
+        }
+        for key in TREND_SERIES_GROUPS:
+            series_contacted = getattr(row, f"{key}_contacted") or 0
+            series_deals = getattr(row, f"{key}_deals") or 0
+            total_series[key]["contacted"] += series_contacted
+            total_series[key]["deals"] += series_deals
+            item[key] = {
+                "contact_share": _safe_ratio(series_contacted, contacted),
+                "contact_penetration": _safe_ratio(series_deals, series_contacted),
+            }
+        items.append(item)
+
+    total_deliveries = sum(item["deliveries"] for item in items)
+    total_contacted = sum(item["contacted"] for item in items)
+    total_deals = sum(item["deals"] for item in items)
+    total_revenue = sum(item["total_revenue"] for item in items)
+    summary = {
+        "store_name": "筛选范围汇总",
+        "salesperson_count": len({name for item in items for name in item["salespeople"]}),
+        "salespeople": sorted({name for item in items for name in item["salespeople"]}),
+        "deliveries": total_deliveries,
+        "contacted": total_contacted,
+        "deals": total_deals,
+        "total_revenue": round(total_revenue, 2),
+        "delivery_penetration": _safe_ratio(total_deals, total_deliveries),
+        "contact_rate": _safe_ratio(total_contacted, total_deliveries),
+        "contact_penetration": _safe_ratio(total_deals, total_contacted),
+        "avg_deal_amount": round(total_revenue / total_deals, 2) if total_deals else 0.0,
+        "wuyou_five_year_ratio": _safe_ratio(
+            sum(row.wuyou_five_year_deals or 0 for row in rows),
+            sum(row.wuyou_deals or 0 for row in rows),
+        ),
+        "trend": [],
+    }
+    for key in TREND_SERIES_GROUPS:
+        summary[key] = {
+            "contact_share": _safe_ratio(total_series[key]["contacted"], total_contacted),
+            "contact_penetration": _safe_ratio(total_series[key]["deals"], total_series[key]["contacted"]),
+        }
+    items.sort(key=lambda item: (-item["deals"], -item["deliveries"], item["store_name"]))
     return {"summary": summary, "items": items}

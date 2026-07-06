@@ -35,12 +35,14 @@ export function SalespersonMetricsTable({
   showStores = false,
   showLastRecordDate = false,
   onPersonClick,
+  onStoreClick,
 }: {
   items: SalespersonStoreMetrics[];
   summary: SalespersonStoreMetrics;
   showStores?: boolean;
   showLastRecordDate?: boolean;
   onPersonClick?: (name: string) => void;
+  onStoreClick?: (store: string) => void;
 }) {
   const maxima = {
     deliveries: Math.max(0, ...items.map((item) => item.deliveries)),
@@ -53,7 +55,7 @@ export function SalespersonMetricsTable({
       sorter: (a, b) => a.salesperson.localeCompare(b.salesperson, "zh-CN"),
       render: (name: string) => onPersonClick ? <Button type="link" size="small" onClick={() => onPersonClick(name)}>{name}</Button> : name },
     ...(showStores ? [{ title: "所在门店", dataIndex: "stores", key: "stores", width: 190,
-      render: (stores: string[]) => <Tooltip title={stores.join("、")}><div className="store-tags-cell">{stores.slice(0, 2).map((store) => <Tag key={store}>{store}</Tag>)}{stores.length > 2 ? `+${stores.length - 2}` : ""}</div></Tooltip>,
+      render: (stores: string[]) => <Tooltip title={stores.join("、")}><div className="store-tags-cell">{stores.slice(0, 2).map((store) => <Tag key={store} className={onStoreClick ? "clickable-tag" : undefined} onClick={() => onStoreClick?.(store)}>{store}</Tag>)}{stores.length > 2 ? `+${stores.length - 2}` : ""}</div></Tooltip>,
       sorter: (a: SalespersonStoreMetrics, b: SalespersonStoreMetrics) => a.stores.join().localeCompare(b.stores.join(), "zh-CN") }] : []),
     { title: "首次录客日期", dataIndex: "first_record_date", key: "first_record_date", width: 112,
       sorter: (a, b) => (a.first_record_date || "").localeCompare(b.first_record_date || "") },

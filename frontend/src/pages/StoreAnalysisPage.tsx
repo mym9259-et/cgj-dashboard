@@ -5,6 +5,7 @@ import {
   Card,
   Checkbox,
   DatePicker,
+  Descriptions,
   Empty,
   Segmented,
   Select,
@@ -22,11 +23,13 @@ import type { ColumnsType } from "antd/es/table";
 import type { Dayjs } from "dayjs";
 import dayjs from "dayjs";
 import ReactECharts from "echarts-for-react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { getOverview } from "../api/dashboard";
 import {
   getStorePeriodComparison,
   getStoreSalespeople,
   getStoreScore,
+  getStoreOverview,
   searchStores,
 } from "../api/storeAnalysis";
 import { DashboardOverviewContent } from "../components/dashboard/DashboardOverviewContent";
@@ -39,6 +42,7 @@ import type {
   SalespersonTrendMetricKey,
   StoreAnalysisData,
   StorePeriod,
+  StoreOverviewItem,
 } from "../types/storeAnalysis";
 import { formatCurrency, formatPercent } from "../utils/formatters";
 import "./StoreAnalysisPage.css";
@@ -216,6 +220,22 @@ function ScorePanel({ data }: { data: StoreAnalysisData["score"] }) {
   );
 }
 
+function StoreProfilePanel({ data }: { data: StoreOverviewItem | null }) {
+  return <Card title="门店基础信息" className="store-profile-card">
+    <Descriptions column={1} size="small" items={[
+      { key: "name", label: "门店名称", children: data?.store_name || "--" },
+      { key: "manager", label: "门店总经理", children: data?.store_manager || "--" },
+      { key: "region", label: "所在大区", children: data?.region || "--" },
+      { key: "province", label: "省份", children: data?.province || "--" },
+      { key: "city", label: "城市", children: data?.city || "--" },
+      { key: "dealer", label: "经销商/直营", children: data?.dealer_direct || "--" },
+      { key: "mode", label: "模式", children: data?.store_mode || "--" },
+      { key: "first", label: "首次录客日期", children: data?.first_record_date || "--" },
+      { key: "last", label: "周期内末次录客日期", children: data?.last_record_date || "--" },
+    ]} />
+  </Card>;
+}
+
 const SALESPERSON_TREND_OPTIONS: { label: string; value: SalespersonTrendMetricKey; format: "number" | "percent" | "currency" }[] = [
   { label: "交付数", value: "deliveries", format: "number" }, { label: "触客数", value: "contacted", format: "number" },
   { label: "成交数", value: "deals", format: "number" }, { label: "销售额", value: "total_revenue", format: "currency" },
@@ -311,9 +331,14 @@ function buildSalespersonColumns(summary: SalespersonStoreMetrics): ColumnsType<
 ] };
 
 export default function StoreAnalysisPage() {
+  const navigate = useNavigate();
+  const [params] = useSearchParams();
   const cachedState = (() => { try { return JSON.parse(sessionStorage.getItem("cgj-store-analysis-state-v1") || "{}"); } catch { return {}; } })();
-  const [storeName, setStoreName] = useState<string | undefined>(cachedState.storeName);
-  const [dateRange, setDateRange] = useState<[Dayjs, Dayjs] | null>(cachedState.startDate && cachedState.endDate ? [dayjs(cachedState.startDate), dayjs(cachedState.endDate)] : null);
+  const queryStore = params.get("store") || undefined;
+  const queryStart = params.get("start_date");
+  const queryEnd = params.get("end_date");
+  const [storeName, setStoreName] = useState<string | undefined>(queryStore || cachedState.storeName);
+  const [dateRange, setDateRange] = useState<[Dayjs, Dayjs] | null>(queryStart && queryEnd ? [dayjs(queryStart), dayjs(queryEnd)] : cachedState.startDate && cachedState.endDate ? [dayjs(cachedState.startDate), dayjs(cachedState.endDate)] : null);
   const [storeKeyword, setStoreKeyword] = useState("");
   const debouncedKeyword = useDebounce(storeKeyword, 250);
   const [storeOptions, setStoreOptions] = useState<string[]>([]);
@@ -322,6 +347,7 @@ export default function StoreAnalysisPage() {
   const [salespersonMetrics, setSalespersonMetrics] = useState<SalespersonTrendMetricKey[]>(cachedState.salespersonMetrics || ["contact_penetration", "contact_penetration_ma7"]);
   const [selectedSalespeople, setSelectedSalespeople] = useState<string[]>(cachedState.selectedSalespeople || []);
   const [data, setData] = useState<StoreAnalysisData | null>(null);
+  const [storeProfile, setStoreProfile] = useState<StoreOverviewItem | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>();
 
@@ -364,10 +390,12 @@ export default function StoreAnalysisPage() {
       getStorePeriodComparison(storeName, endDate, "week"),
       getOverview(storeFilter, "AND", startDate, endDate),
       getStoreSalespeople(storeName, startDate, endDate),
+      getStoreOverview(storeFilter, "AND", startDate, endDate),
     ])
-      .then(([score, monthly, weekly, overview, salespeople]) => {
+      .then(([score, monthly, weekly, overview, salespeople, storeOverview]) => {
         if (!cancelled) {
           setData({ score, monthly, weekly, overview, salespeople });
+          setStoreProfile(storeOverview.items[0] || null);
           setSelectedSalespeople((current) => current.length > 0 ? current.filter((name) => salespeople.items.some((item) => item.salesperson === name)) :
             [...salespeople.items].sort((a, b) => b.contacted - a.contacted).slice(0, 5).map((item) => item.salesperson));
         }
@@ -413,7 +441,7 @@ export default function StoreAnalysisPage() {
     <div className="store-analysis-page">
       <div className="store-analysis-heading store-analysis-sticky-toolbar">
         <div>
-          <h1>门店分析</h1>
+          <h1>单店分析</h1>
           {storeName ? <span>{storeName}</span> : null}
         </div>
         <div className="store-analysis-toolbar">
@@ -450,7 +478,10 @@ export default function StoreAnalysisPage() {
         <Spin size="large" style={{ display: "block", margin: "120px auto" }} />
       ) : data ? (
         <div className={loading ? "store-analysis-content is-refreshing" : "store-analysis-content"}>
-          <ScorePanel data={data.score} />
+          <div className="store-profile-score-grid">
+            <StoreProfilePanel data={storeProfile} />
+            <ScorePanel data={data.score} />
+          </div>
 
           <Card
             title="经营周期对比"
@@ -474,7 +505,8 @@ export default function StoreAnalysisPage() {
           </section>
 
           <Card title="销售员经营明细">
-            <SalespersonMetricsTable items={data.salespeople.items} summary={data.salespeople.summary} />
+            <SalespersonMetricsTable items={data.salespeople.items} summary={data.salespeople.summary}
+              onPersonClick={(name) => navigate(`/people-analysis/individual?${new URLSearchParams({ name, start_date: startDate!, end_date: endDate! })}`)} />
           </Card>
         </div>
       ) : null}
