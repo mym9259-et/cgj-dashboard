@@ -111,6 +111,33 @@ def build_periods(granularity: str, end_date: date, earliest_date: date | None) 
     return periods[max(0, first_visible_index - 1):]
 
 
+def build_weekly_ratio_trends(rows: list, periods: list[dict], group_field: str) -> dict[str, list[dict]]:
+    """Build weighted ratio points for six non-overlapping weekly windows."""
+    grouped: dict[str, list] = {}
+    for row in rows:
+        grouped.setdefault(getattr(row, group_field), []).append(row)
+
+    result: dict[str, list[dict]] = {}
+    for group, group_rows in grouped.items():
+        points = []
+        for period in periods:
+            period_rows = [
+                row for row in group_rows
+                if period["start_date"] <= row.day <= period["end_date"]
+            ]
+            deliveries = sum((row.deliveries or 0) for row in period_rows)
+            contacted = sum((row.contacted or 0) for row in period_rows)
+            deals = sum((row.deals or 0) for row in period_rows)
+            points.append({
+                "day": period["end_date"],
+                "delivery_penetration": _safe_ratio(deals, deliveries),
+                "contact_rate": _safe_ratio(contacted, deliveries),
+                "contact_penetration": _safe_ratio(deals, contacted),
+            })
+        result[group] = points
+    return result
+
+
 def _empty_accumulator() -> dict:
     data = {
         "deliveries": 0,
@@ -725,6 +752,35 @@ async def get_people_analysis(
             "contact_penetration": _safe_ratio(deals, contacted),
         }
 
+    summary["contact_penetration_trend"] = []
+    if items:
+        anchor = end_date or max(
+            (item["last_record_date"] for item in items if item["last_record_date"]),
+            default=date.today(),
+        )
+        weekly_periods = build_periods("week", anchor, None)[1:]
+        trend_clauses, trend_needs_join = _build_where_clauses(filters, filter_logic, None, None)
+        trend_stmt = select(
+            Lead.salesperson,
+            Lead.delivery_date.label("day"),
+            func.count().label("deliveries"),
+            func.count().filter(Lead.contact_status == CONTACT_STATUS_REACHED).label("contacted"),
+            func.count().filter(Lead.deal_status == DEAL_STATUS_SUCCESS).label("deals"),
+        ).select_from(Lead)
+        trend_stmt = _apply_store_join_if_needed(trend_stmt, trend_needs_join)
+        trend_stmt = _apply_clauses(trend_stmt, [
+            *trend_clauses,
+            Lead.salesperson.isnot(None),
+            Lead.salesperson != "",
+            Lead.delivery_date >= weekly_periods[0]["start_date"],
+            Lead.delivery_date <= weekly_periods[-1]["end_date"],
+        ]).group_by(Lead.salesperson, Lead.delivery_date)
+        weekly_trends = build_weekly_ratio_trends(
+            (await db.execute(trend_stmt)).all(), weekly_periods, "salesperson"
+        )
+        for item in items:
+            item["contact_penetration_trend"] = weekly_trends.get(item["salesperson"], [])
+
     items.sort(key=lambda item: (-item["deals"], -item["deliveries"], item["salesperson"]))
     return {"summary": summary, "items": items}
 
@@ -798,6 +854,12 @@ async def get_store_overview(
         for store_name, salesperson in (await db.execute(people_stmt)).all():
             salespeople.setdefault(store_name, []).append(salesperson)
 
+    anchor = end_date or max(
+        (row.last_record_date for row in rows if row.last_record_date),
+        default=date.today(),
+    )
+    weekly_periods = build_periods("week", anchor, None)[1:]
+    trend_clauses, _ = _build_where_clauses(filters, filter_logic, None, None)
     daily_stmt = select(
         Lead.merchant_name.label("store_name"),
         Lead.delivery_date.label("day"),
@@ -806,18 +868,17 @@ async def get_store_overview(
         func.count().filter(Lead.deal_status == DEAL_STATUS_SUCCESS).label("deals"),
     ).select_from(Lead).outerjoin(StoreMapping, Lead.merchant_name == StoreMapping.merchant_name)
     daily_rows = (await db.execute(
-        _apply_clauses(daily_stmt, [*clauses, Lead.delivery_date.isnot(None)])
+        _apply_clauses(daily_stmt, [
+            *trend_clauses,
+            Lead.merchant_name.isnot(None),
+            Lead.merchant_name != "",
+            Lead.delivery_date >= weekly_periods[0]["start_date"],
+            Lead.delivery_date <= weekly_periods[-1]["end_date"],
+        ])
         .group_by(Lead.merchant_name, Lead.delivery_date)
         .order_by(Lead.merchant_name, Lead.delivery_date)
     )).all()
-    trends: dict[str, list[dict]] = {name: [] for name in store_names}
-    for row in daily_rows:
-        trends.setdefault(row.store_name, []).append({
-            "day": row.day,
-            "delivery_penetration": _safe_ratio(row.deals or 0, row.deliveries or 0),
-            "contact_rate": _safe_ratio(row.contacted or 0, row.deliveries or 0),
-            "contact_penetration": _safe_ratio(row.deals or 0, row.contacted or 0),
-        })
+    trends = build_weekly_ratio_trends(daily_rows, weekly_periods, "store_name")
 
     items = []
     total_series = {key: {"contacted": 0, "deals": 0} for key in TREND_SERIES_GROUPS}

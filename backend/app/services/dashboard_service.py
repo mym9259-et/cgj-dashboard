@@ -9,6 +9,7 @@ from sqlalchemy.sql import Select
 from app.core.constants import CONTACT_STATUS_REACHED, DEAL_STATUS_SUCCESS, STORE_MAPPING_FIELDS
 from app.models.car_series_mapping import CarSeriesMapping
 from app.models.lead import Lead
+from app.models.personnel_mapping import PersonnelMapping
 from app.models.store_mapping import StoreMapping
 
 
@@ -186,6 +187,12 @@ async def get_kpi_data(
     if total == 0:
         return {
             "total_leads": 0, "deal_count": 0, "deal_rate": 0.0,
+            "new_operating_store_count": 0, "active_store_count": 0,
+            "new_salesperson_count": 0, "active_salesperson_count": 0,
+            "new_car_manager_count": 0, "new_platform_coach_count": 0,
+            "new_certified_coach_count": 0,
+            "car_manager_count": 0, "platform_coach_count": 0,
+            "certified_coach_count": 0,
             "total_revenue": 0.0, "avg_deal_amount": 0.0,
             "contacted_count": 0, "contacted_rate": 0.0,
             "refund_count": 0, "refund_rate": 0.0, "refund_amount": 0.0,
@@ -209,6 +216,91 @@ async def get_kpi_data(
     wuyou_deals = await db.scalar(_count(clauses, needs_join, [Lead.deal_status == DEAL_STATUS_SUCCESS, Lead.product_type == "无忧产品"])) or 0
     wuyou_five_year_deals = await db.scalar(_count(clauses, needs_join, [Lead.deal_status == DEAL_STATUS_SUCCESS, Lead.product_type == "无忧产品", Lead.product_years.in_(["5"])])) or 0
     wuyou_five_year_ratio = round(wuyou_five_year_deals / wuyou_deals, 4) if wuyou_deals > 0 else 0.0
+
+    first_store_dates = (
+        select(
+            Lead.merchant_name.label("store_name"),
+            func.min(Lead.delivery_date).label("first_record_date"),
+        )
+        .where(
+            Lead.merchant_name.isnot(None),
+            Lead.merchant_name != "",
+            Lead.delivery_date.isnot(None),
+        )
+        .group_by(Lead.merchant_name)
+        .subquery()
+    )
+    new_store_stmt = (
+        select(func.count(func.distinct(Lead.merchant_name)))
+        .select_from(Lead)
+        .join(first_store_dates, Lead.merchant_name == first_store_dates.c.store_name)
+    )
+    new_store_stmt = _apply_store_join_if_needed(new_store_stmt, needs_join)
+    new_store_stmt = _apply_clauses(new_store_stmt, clauses).where(
+        Lead.merchant_name.isnot(None), Lead.merchant_name != ""
+    )
+    if start_date:
+        new_store_stmt = new_store_stmt.where(first_store_dates.c.first_record_date >= start_date)
+    if end_date:
+        new_store_stmt = new_store_stmt.where(first_store_dates.c.first_record_date <= end_date)
+    new_operating_store_count = await db.scalar(new_store_stmt) or 0
+    active_store_stmt = select(func.count(func.distinct(Lead.merchant_name))).select_from(Lead)
+    active_store_stmt = _apply_store_join_if_needed(active_store_stmt, needs_join)
+    active_store_stmt = _apply_clauses(active_store_stmt, clauses).where(
+        Lead.merchant_name.isnot(None), Lead.merchant_name != ""
+    )
+    active_store_count = await db.scalar(active_store_stmt) or 0
+
+    first_salesperson_dates = (
+        select(
+            Lead.salesperson.label("salesperson"),
+            func.min(Lead.delivery_date).label("first_record_date"),
+        )
+        .where(
+            Lead.salesperson.isnot(None),
+            Lead.salesperson != "",
+            Lead.delivery_date.isnot(None),
+        )
+        .group_by(Lead.salesperson)
+        .subquery()
+    )
+
+    role_stmt = (
+        select(
+            func.count(func.distinct(Lead.salesperson)).label("active_salesperson_count"),
+            func.count(func.distinct(Lead.salesperson)).filter(PersonnelMapping.role == "车管家").label("car_manager_count"),
+            func.count(func.distinct(Lead.salesperson)).filter(PersonnelMapping.role == "平台教练").label("platform_coach_count"),
+            func.count(func.distinct(Lead.salesperson)).filter(PersonnelMapping.role == "认证教练").label("certified_coach_count"),
+        )
+        .select_from(Lead)
+        .outerjoin(PersonnelMapping, Lead.salesperson == PersonnelMapping.salesperson)
+    )
+    role_stmt = _apply_store_join_if_needed(role_stmt, needs_join)
+    role_stmt = _apply_clauses(role_stmt, clauses).where(
+        Lead.salesperson.isnot(None), Lead.salesperson != ""
+    )
+    role_row = (await db.execute(role_stmt)).one()
+
+    new_role_stmt = (
+        select(
+            func.count(func.distinct(Lead.salesperson)).label("new_salesperson_count"),
+            func.count(func.distinct(Lead.salesperson)).filter(PersonnelMapping.role == "车管家").label("new_car_manager_count"),
+            func.count(func.distinct(Lead.salesperson)).filter(PersonnelMapping.role == "平台教练").label("new_platform_coach_count"),
+            func.count(func.distinct(Lead.salesperson)).filter(PersonnelMapping.role == "认证教练").label("new_certified_coach_count"),
+        )
+        .select_from(Lead)
+        .join(first_salesperson_dates, Lead.salesperson == first_salesperson_dates.c.salesperson)
+        .outerjoin(PersonnelMapping, Lead.salesperson == PersonnelMapping.salesperson)
+    )
+    new_role_stmt = _apply_store_join_if_needed(new_role_stmt, needs_join)
+    new_role_stmt = _apply_clauses(new_role_stmt, clauses).where(
+        Lead.salesperson.isnot(None), Lead.salesperson != ""
+    )
+    if start_date:
+        new_role_stmt = new_role_stmt.where(first_salesperson_dates.c.first_record_date >= start_date)
+    if end_date:
+        new_role_stmt = new_role_stmt.where(first_salesperson_dates.c.first_record_date <= end_date)
+    new_role_row = (await db.execute(new_role_stmt)).one()
 
     series_columns = []
     for key, clean_series in SERIES_GROUPS.items():
@@ -250,6 +342,16 @@ async def get_kpi_data(
 
     return {
         "total_leads": total,
+        "new_operating_store_count": new_operating_store_count,
+        "active_store_count": active_store_count,
+        "new_salesperson_count": new_role_row.new_salesperson_count or 0,
+        "active_salesperson_count": role_row.active_salesperson_count or 0,
+        "new_car_manager_count": new_role_row.new_car_manager_count or 0,
+        "new_platform_coach_count": new_role_row.new_platform_coach_count or 0,
+        "new_certified_coach_count": new_role_row.new_certified_coach_count or 0,
+        "car_manager_count": role_row.car_manager_count or 0,
+        "platform_coach_count": role_row.platform_coach_count or 0,
+        "certified_coach_count": role_row.certified_coach_count or 0,
         "deal_count": deals,
         "deal_rate": round(deals / total, 4) if total > 0 else 0.0,
         "total_revenue": round(revenue, 2),

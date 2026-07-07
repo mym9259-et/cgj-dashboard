@@ -5,6 +5,7 @@ from types import SimpleNamespace
 
 from app.services.store_analysis_service import (
     build_periods,
+    build_weekly_ratio_trends,
     accumulate_period_rows,
     calculate_changes,
     calculate_period_metrics,
@@ -33,6 +34,19 @@ class StoreAnalysisServiceTest(unittest.TestCase):
         self.assertEqual(periods[-1]["start_date"], date(2026, 6, 12))
         self.assertEqual(periods[-1]["end_date"], date(2026, 6, 18))
         self.assertEqual(periods[-2]["end_date"], date(2026, 6, 11))
+
+    def test_weekly_ratio_trend_is_weighted_by_weekly_volume(self):
+        periods = [{"start_date": date(2026, 6, 1), "end_date": date(2026, 6, 7)}]
+        rows = [
+            SimpleNamespace(store_name="A", day=date(2026, 6, 1), deliveries=1, contacted=1, deals=1),
+            SimpleNamespace(store_name="A", day=date(2026, 6, 2), deliveries=9, contacted=9, deals=0),
+        ]
+
+        result = build_weekly_ratio_trends(rows, periods, "store_name")
+
+        self.assertEqual(result["A"][0]["delivery_penetration"], 0.1)
+        self.assertEqual(result["A"][0]["contact_rate"], 1.0)
+        self.assertEqual(result["A"][0]["contact_penetration"], 0.1)
 
     def test_period_metrics_include_series_penetration_and_calendar_averages(self):
         raw = {

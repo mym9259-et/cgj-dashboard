@@ -307,6 +307,36 @@ export function DashboardOverviewContent({ data, beforeTrends, betweenTrends, ca
         <Card size="small" className="kpi-card"><Statistic title="销售额" value={Math.round(kpis.total_revenue).toLocaleString()} /></Card>
         <Card size="small" className="kpi-card"><Statistic title="无忧产品5年期占比" value={formatPercent(kpis.wuyou_five_year_ratio, 1)} /></Card>
       </div>
+      <div className="entity-kpi-grid">
+        <Card size="small" className="entity-kpi-card">
+          <div className="entity-kpi-title">新增门店数 / 总门店数</div>
+          <div className="entity-kpi-columns">
+            <Statistic title="新增门店数" value={kpis.new_operating_store_count} />
+            <Statistic title="总门店数" value={kpis.active_store_count} />
+          </div>
+        </Card>
+        <Card size="small" className="entity-kpi-card">
+          <div className="entity-kpi-title">新增销售员数 / 总销售员数</div>
+          <div className="entity-kpi-columns">
+            <div>
+              <Statistic title="新增销售员数" value={kpis.new_salesperson_count} />
+              <div className="salesperson-role-breakdown">
+                <span>车管家 <strong>{kpis.new_car_manager_count}</strong></span>
+                <span>平台教练 <strong>{kpis.new_platform_coach_count}</strong></span>
+                <span>认证教练 <strong>{kpis.new_certified_coach_count}</strong></span>
+              </div>
+            </div>
+            <div>
+              <Statistic title="总销售员数" value={kpis.active_salesperson_count} />
+              <div className="salesperson-role-breakdown">
+                <span>车管家 <strong>{kpis.car_manager_count}</strong></span>
+                <span>平台教练 <strong>{kpis.platform_coach_count}</strong></span>
+                <span>认证教练 <strong>{kpis.certified_coach_count}</strong></span>
+              </div>
+            </div>
+          </div>
+        </Card>
+      </div>
       <div className="overview-kpi-grid overview-kpi-grid-spaced">
         <Card size="small" className="kpi-card"><Statistic title="触客率" value={formatPercent(kpis.contact_rate, 1)} /></Card>
         <Card size="small" className="kpi-card"><Statistic title="触客渗透率" value={formatPercent(kpis.contact_penetration, 1)} valueStyle={{ color: penColor(kpis.contact_penetration, 0.4) }} /></Card>

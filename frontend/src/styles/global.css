@@ -45,6 +45,70 @@ body {
   margin-top: 16px;
 }
 
+.entity-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.entity-kpi-card {
+  min-width: 0;
+}
+
+.entity-kpi-title {
+  margin-bottom: 10px;
+  color: #595959;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.entity-kpi-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.entity-kpi-columns > * + * {
+  padding-left: 20px;
+  border-left: 1px solid #f0f0f0;
+}
+
+.salesperson-role-breakdown {
+  display: flex;
+  margin-top: 7px;
+  color: #8c8c8c;
+  font-size: 11px;
+  line-height: 1.5;
+  gap: 3px 10px;
+  flex-wrap: wrap;
+}
+
+.salesperson-role-breakdown strong {
+  color: #434343;
+  font-weight: 600;
+}
+
+@media (max-width: 900px) {
+  .entity-kpi-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .entity-kpi-columns {
+    grid-template-columns: 1fr;
+  }
+
+  .entity-kpi-columns > * + * {
+    padding-top: 12px;
+    padding-left: 0;
+    border-top: 1px solid #f0f0f0;
+    border-left: 0;
+  }
+}
+
 .structure-metric-grid {
   display: grid;
   grid-template-columns: 120px repeat(4, 112px);

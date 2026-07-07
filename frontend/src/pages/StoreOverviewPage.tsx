@@ -30,7 +30,7 @@ function Sparkline({ rows, metric }: { rows: StoreDailyTrend[]; metric: TrendKey
     const y = height - 2 - (value / max) * (height - 4);
     return `${x.toFixed(1)},${y.toFixed(1)}`;
   }).join(" ");
-  return <Tooltip title={`${rows[0].day} 至 ${rows[rows.length - 1].day}`}>
+  return <Tooltip title={<div>{rows.map((row) => <div key={row.day}>{row.day}：{formatPercent(row[metric], 1)}</div>)}</div>}>
     <svg className="store-sparkline" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="指标趋势">
       <polyline points={points} fill="none" stroke="currentColor" strokeWidth="2" vectorEffect="non-scaling-stroke" />
     </svg>
@@ -142,11 +142,11 @@ export default function StoreOverviewPage() {
       { title: "成交数", dataIndex: "deals", key: "deals", width: 82, align: "right", sorter: (a, b) => a.deals - b.deals, render: (value: number) => <ScaleValue value={value} max={maxima.deals} /> },
       { title: "销售额", dataIndex: "total_revenue", key: "total_revenue", width: 112, align: "right", sorter: (a, b) => a.total_revenue - b.total_revenue, render: (value: number) => <ScaleValue value={value} max={maxima.total_revenue} currency /> },
       { title: "交付渗透率", dataIndex: "delivery_penetration", key: "delivery_penetration", width: 108, align: "right", sorter: (a, b) => a.delivery_penetration - b.delivery_penetration, render: (value: number) => <HeatValue value={value} benchmark={summary?.delivery_penetration || 0} /> },
-      { title: "交付渗透趋势", key: "delivery_penetration_trend", width: 126, render: (_, record) => <Sparkline rows={record.trend} metric="delivery_penetration" /> },
+      { title: "交付渗透率周环比趋势", key: "delivery_penetration_trend", width: 148, align: "center", render: (_, record) => <Sparkline rows={record.trend} metric="delivery_penetration" /> },
       { title: "触客率", dataIndex: "contact_rate", key: "contact_rate", width: 88, align: "right", sorter: (a, b) => a.contact_rate - b.contact_rate, render: (value: number) => <HeatValue value={value} benchmark={summary?.contact_rate || 0} /> },
-      { title: "触客率趋势", key: "contact_rate_trend", width: 126, render: (_, record) => <Sparkline rows={record.trend} metric="contact_rate" /> },
+      { title: "触客率周环比趋势", key: "contact_rate_trend", width: 148, align: "center", render: (_, record) => <Sparkline rows={record.trend} metric="contact_rate" /> },
       { title: "触客渗透率", dataIndex: "contact_penetration", key: "contact_penetration", width: 108, align: "right", sorter: (a, b) => a.contact_penetration - b.contact_penetration, render: (value: number) => <HeatValue value={value} benchmark={summary?.contact_penetration || 0} /> },
-      { title: "触客渗透趋势", key: "contact_penetration_trend", width: 126, render: (_, record) => <Sparkline rows={record.trend} metric="contact_penetration" /> },
+      { title: "触客渗透率周环比趋势", key: "contact_penetration_trend", width: 148, align: "center", render: (_, record) => <Sparkline rows={record.trend} metric="contact_penetration" /> },
       { title: "客单价", dataIndex: "avg_deal_amount", key: "avg_deal_amount", width: 108, align: "right", sorter: (a, b) => a.avg_deal_amount - b.avg_deal_amount, render: (value: number) => <HeatValue value={value} benchmark={summary?.avg_deal_amount || 0} currency /> },
       { title: "无忧5年期占比", dataIndex: "wuyou_five_year_ratio", key: "wuyou_five_year_ratio", width: 126, align: "right", sorter: (a, b) => a.wuyou_five_year_ratio - b.wuyou_five_year_ratio, render: (value: number) => <HeatValue value={value} benchmark={summary?.wuyou_five_year_ratio || 0} /> },
       ...SERIES_COLUMNS.map((series) => ({ title: series.label, children: [
@@ -156,7 +156,8 @@ export default function StoreOverviewPage() {
     ];
   }, [data, debouncedStart, debouncedEnd, navigate]);
 
-  const summaryCells = (summary: StoreOverviewItem): ReactNode[] => columns.flatMap((column) => "children" in column && column.children ? column.children : [column]).map((column) => {
+  const leafColumns = columns.flatMap((column) => "children" in column && column.children ? column.children : [column]);
+  const summaryCells = (summary: StoreOverviewItem): ReactNode[] => leafColumns.map((column) => {
     const key = String(column.key || "");
     if (key === "store_name") return summary.store_name;
     if (key === "salesperson_count") return `${summary.salesperson_count} 人`;
@@ -180,7 +181,7 @@ export default function StoreOverviewPage() {
         : data?.items.length ? <Table rowKey="store_name" size="small" bordered sticky columns={columns} dataSource={data.items}
           pagination={{ pageSize: 20, showSizeChanger: true }} scroll={{ x: "max-content" }}
           summary={() => data ? <Table.Summary fixed="top"><Table.Summary.Row className="store-summary-row">
-            {summaryCells(data.summary).map((value, index) => <Table.Summary.Cell key={index} index={index}>{value}</Table.Summary.Cell>)}
+            {summaryCells(data.summary).map((value, index) => <Table.Summary.Cell key={index} index={index} align={leafColumns[index]?.align}>{value}</Table.Summary.Cell>)}
           </Table.Summary.Row></Table.Summary> : null} />
         : <Empty description="当前筛选范围内暂无门店数据" />}
     </Card>

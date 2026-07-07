@@ -62,6 +62,13 @@ class SeriesSalespersonMetrics(BaseModel):
     contact_penetration: float = 0.0
 
 
+class StoreDailyTrend(BaseModel):
+    day: date
+    delivery_penetration: float = 0.0
+    contact_rate: float = 0.0
+    contact_penetration: float = 0.0
+
+
 class SalespersonStoreMetrics(BaseModel):
     salesperson: str
     first_record_date: date | None = None
@@ -74,6 +81,7 @@ class SalespersonStoreMetrics(BaseModel):
     contact_penetration: float = 0.0
     avg_deal_amount: float = 0.0
     wuyou_five_year_ratio: float = 0.0
+    contact_penetration_trend: list[StoreDailyTrend] = []
     a_series: SeriesSalespersonMetrics
     b_series: SeriesSalespersonMetrics
     c_series: SeriesSalespersonMetrics
@@ -112,13 +120,6 @@ class StoreSalespeopleResponse(BaseModel):
 class PeopleAnalysisResponse(BaseModel):
     summary: SalespersonStoreMetrics
     items: list[SalespersonStoreMetrics]
-
-
-class StoreDailyTrend(BaseModel):
-    day: date
-    delivery_penetration: float = 0.0
-    contact_rate: float = 0.0
-    contact_penetration: float = 0.0
 
 
 class StoreOverviewItem(BaseModel):

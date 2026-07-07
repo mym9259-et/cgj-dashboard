@@ -57,6 +57,7 @@ export default function PeopleAnalysisPage() {
       {loading && !data ? <Spin size="large" style={{ display: "block", margin: "80px auto" }} />
         : data && data.items.length ? <SalespersonMetricsTable items={data.items} summary={data.summary}
             showStores showLastRecordDate
+            showContactPenetrationTrend
             onPersonClick={(name) => navigate(`/people-analysis/individual?${detailQuery({ name })}`)}
             onStoreClick={(store) => navigate(`/store-analysis?${detailQuery({ store })}`)} />
         : <Empty description="当前筛选范围内暂无销售员数据" />}

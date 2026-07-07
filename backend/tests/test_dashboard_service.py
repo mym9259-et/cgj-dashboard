@@ -9,15 +9,25 @@ from app.services.dashboard_service import TREND_SERIES_GROUPS, _build_where_cla
 
 
 class ScalarSession:
-    def __init__(self, values, series_row):
+    def __init__(self, values, role_row, series_row):
         self._values = iter(values)
-        self._series_row = SimpleNamespace(**series_row)
+        self._execute_rows = iter([
+            SimpleNamespace(**role_row),
+            SimpleNamespace(
+                new_salesperson_count=2,
+                new_car_manager_count=1,
+                new_platform_coach_count=1,
+                new_certified_coach_count=0,
+            ),
+            SimpleNamespace(**series_row),
+        ])
 
     async def scalar(self, _statement):
         return next(self._values)
 
     async def execute(self, _statement):
-        return SimpleNamespace(one=lambda: self._series_row)
+        row = next(self._execute_rows)
+        return SimpleNamespace(one=lambda: row)
 
 
 class DashboardServiceTest(unittest.IsolatedAsyncioTestCase):
@@ -53,7 +63,13 @@ class DashboardServiceTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_kpis_include_five_year_metrics_when_data_exists(self):
         db = ScalarSession(
-            [10, 8, 5, 5000, 1, 100, 3, 4, 2],
+            [10, 8, 5, 5000, 1, 100, 3, 4, 2, 2, 3],
+            {
+                "active_salesperson_count": 6,
+                "car_manager_count": 2,
+                "platform_coach_count": 1,
+                "certified_coach_count": 1,
+            },
             {
                 "a_series_count": 2, "a_series_contacted": 2, "a_series_deals": 1,
                 "b_series_count": 3, "b_series_contacted": 2, "b_series_deals": 1,
@@ -67,6 +83,16 @@ class DashboardServiceTest(unittest.IsolatedAsyncioTestCase):
         result = await get_kpi_data(db)
 
         self.assertEqual(result["total_leads"], 10)
+        self.assertEqual(result["new_operating_store_count"], 2)
+        self.assertEqual(result["active_store_count"], 3)
+        self.assertEqual(result["new_salesperson_count"], 2)
+        self.assertEqual(result["active_salesperson_count"], 6)
+        self.assertEqual(result["new_car_manager_count"], 1)
+        self.assertEqual(result["new_platform_coach_count"], 1)
+        self.assertEqual(result["new_certified_coach_count"], 0)
+        self.assertEqual(result["car_manager_count"], 2)
+        self.assertEqual(result["platform_coach_count"], 1)
+        self.assertEqual(result["certified_coach_count"], 1)
         self.assertEqual(result["five_year_deals"], 3)
         self.assertEqual(result["five_year_ratio"], 0.6)
         self.assertEqual(result["wuyou_five_year_ratio"], 0.5)

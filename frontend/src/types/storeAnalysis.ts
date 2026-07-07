@@ -57,6 +57,7 @@ export type SalespersonStoreMetrics = {
   contact_penetration: number;
   avg_deal_amount: number;
   wuyou_five_year_ratio: number;
+  contact_penetration_trend: StoreDailyTrend[];
   a_series: SeriesSalespersonMetrics;
   b_series: SeriesSalespersonMetrics;
   c_series: SeriesSalespersonMetrics;

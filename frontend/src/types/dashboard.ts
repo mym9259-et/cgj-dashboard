@@ -1,5 +1,15 @@
 export interface KpiData {
   total_leads: number;
+  new_operating_store_count: number;
+  active_store_count: number;
+  new_salesperson_count: number;
+  active_salesperson_count: number;
+  new_car_manager_count: number;
+  new_platform_coach_count: number;
+  new_certified_coach_count: number;
+  car_manager_count: number;
+  platform_coach_count: number;
+  certified_coach_count: number;
   deal_count: number;
   deal_rate: number;
   total_revenue: number;

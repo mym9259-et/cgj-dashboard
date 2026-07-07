@@ -23,6 +23,16 @@ class FilterParam(BaseModel):
 
 class KpiResponse(BaseModel):
     total_leads: int = 0
+    new_operating_store_count: int = 0
+    active_store_count: int = 0
+    new_salesperson_count: int = 0
+    active_salesperson_count: int = 0
+    new_car_manager_count: int = 0
+    new_platform_coach_count: int = 0
+    new_certified_coach_count: int = 0
+    car_manager_count: int = 0
+    platform_coach_count: int = 0
+    certified_coach_count: int = 0
     deal_count: int = 0
     deal_rate: float = 0.0
     total_revenue: float = 0.0
