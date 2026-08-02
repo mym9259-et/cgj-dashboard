@@ -21,10 +21,12 @@ export async function getOverview(
   filters: FilterItem[],
   logic: string,
   startDate: string | null,
-  endDate: string | null
+  endDate: string | null,
+  signal?: AbortSignal,
 ): Promise<DashboardOverview> {
   const { data } = await apiClient.get("/dashboard/overview", {
     params: buildParams(filters, logic, startDate, endDate),
+    signal,
   });
   return data;
 }

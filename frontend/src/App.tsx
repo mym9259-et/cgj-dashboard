@@ -1,16 +1,20 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { Spin } from "antd";
+import { lazy, Suspense } from "react";
 import AppLayout from "./components/layout/AppLayout";
 import { useAuth } from "./contexts/AuthContext";
-import ComparePage from "./pages/ComparePage";
-import DashboardPage from "./pages/DashboardPage";
-import LoginPage from "./pages/LoginPage";
-import MappingPage from "./pages/MappingPage";
-import StoreAnalysisPage from "./pages/StoreAnalysisPage";
-import StoreOverviewPage from "./pages/StoreOverviewPage";
-import PeopleAnalysisPage from "./pages/PeopleAnalysisPage";
-import IndividualAnalysisPage from "./pages/IndividualAnalysisPage";
-import UploadPage from "./pages/UploadPage";
+
+const ComparePage = lazy(() => import("./pages/ComparePage"));
+const DashboardPage = lazy(() => import("./pages/DashboardPage"));
+const LoginPage = lazy(() => import("./pages/LoginPage"));
+const MappingPage = lazy(() => import("./pages/MappingPage"));
+const StoreAnalysisPage = lazy(() => import("./pages/StoreAnalysisPage"));
+const StoreOverviewPage = lazy(() => import("./pages/StoreOverviewPage"));
+const PeopleAnalysisPage = lazy(() => import("./pages/PeopleAnalysisPage"));
+const IndividualAnalysisPage = lazy(() => import("./pages/IndividualAnalysisPage"));
+const UploadPage = lazy(() => import("./pages/UploadPage"));
+
+const routeFallback = <Spin size="large" style={{ display: "block", margin: "30vh auto" }} />;
 
 function ProtectedRoutes() {
   return (
@@ -35,22 +39,26 @@ export default function App() {
   const { user, loading } = useAuth();
 
   if (loading) {
-    return <Spin size="large" style={{ display: "block", margin: "30vh auto" }} />;
+    return routeFallback;
   }
 
   if (!user) {
     return (
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
+      <Suspense fallback={routeFallback}>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </Suspense>
     );
   }
 
   return (
-    <Routes>
-      <Route path="/login" element={<Navigate to="/dashboard" replace />} />
-      <Route path="*" element={<ProtectedRoutes />} />
-    </Routes>
+    <Suspense fallback={routeFallback}>
+      <Routes>
+        <Route path="/login" element={<Navigate to="/dashboard" replace />} />
+        <Route path="*" element={<ProtectedRoutes />} />
+      </Routes>
+    </Suspense>
   );
 }

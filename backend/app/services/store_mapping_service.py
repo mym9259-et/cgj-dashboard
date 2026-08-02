@@ -56,7 +56,9 @@ def _build_field_map(excel_columns: list[str]) -> dict[str, str]:
             mapping[col] = "province"
         elif col == "市" or "市" in col:
             mapping[col] = "city"
-        elif "零跑" in col and "是否" in col:
+        # Keep accepting the old downloadable template header while the UI and
+        # newly exported template use the correct business term "是否零跑".
+        elif "是否" in col and ("零跑" in col or "零售" in col):
             mapping[col] = "is_lingpao"
         elif "总经理" in col or "门店总经理" in col:
             mapping[col] = "store_manager"

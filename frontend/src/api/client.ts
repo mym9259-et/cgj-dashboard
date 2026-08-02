@@ -9,6 +9,7 @@ const apiClient = axios.create({
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
+    if (error.code === "ERR_CANCELED") return Promise.reject(error);
     if (error.response?.status === 401 && !String(error.config?.url || "").includes("/auth/login")) {
       window.dispatchEvent(new Event("auth:unauthorized"));
     }

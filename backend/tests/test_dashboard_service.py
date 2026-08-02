@@ -9,21 +9,13 @@ from app.services.dashboard_service import TREND_SERIES_GROUPS, _build_where_cla
 
 
 class ScalarSession:
-    def __init__(self, values, role_row, series_row):
-        self._values = iter(values)
+    def __init__(self, aggregate_row, store_row, role_row, series_row):
         self._execute_rows = iter([
+            SimpleNamespace(**aggregate_row),
+            SimpleNamespace(**store_row),
             SimpleNamespace(**role_row),
-            SimpleNamespace(
-                new_salesperson_count=2,
-                new_car_manager_count=1,
-                new_platform_coach_count=1,
-                new_certified_coach_count=0,
-            ),
             SimpleNamespace(**series_row),
         ])
-
-    async def scalar(self, _statement):
-        return next(self._values)
 
     async def execute(self, _statement):
         row = next(self._execute_rows)
@@ -63,12 +55,30 @@ class DashboardServiceTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_kpis_include_five_year_metrics_when_data_exists(self):
         db = ScalarSession(
-            [10, 8, 5, 5000, 1, 100, 3, 4, 2, 2, 3],
+            {
+                "total": 10,
+                "contacted": 8,
+                "deals": 5,
+                "revenue": 5000,
+                "refunds": 1,
+                "refund_amount": 100,
+                "five_year_deals": 3,
+                "wuyou_deals": 4,
+                "wuyou_five_year_deals": 2,
+            },
+            {
+                "new_operating_store_count": 2,
+                "active_store_count": 3,
+            },
             {
                 "active_salesperson_count": 6,
                 "car_manager_count": 2,
                 "platform_coach_count": 1,
                 "certified_coach_count": 1,
+                "new_salesperson_count": 2,
+                "new_car_manager_count": 1,
+                "new_platform_coach_count": 1,
+                "new_certified_coach_count": 0,
             },
             {
                 "a_series_count": 2, "a_series_contacted": 2, "a_series_deals": 1,

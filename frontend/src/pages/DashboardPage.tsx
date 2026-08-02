@@ -22,20 +22,25 @@ export default function DashboardPage() {
 
   useEffect(() => {
     let cancelled = false;
+    const controller = new AbortController();
     setLoading(true);
     Promise.all([
-      getOverview(debouncedFilters, debouncedLogic, debouncedStartDate, debouncedEndDate),
-      getScopePeriodComparison(debouncedFilters, debouncedLogic, debouncedEndDate, "month"),
-      getScopePeriodComparison(debouncedFilters, debouncedLogic, debouncedEndDate, "week"),
+      getOverview(debouncedFilters, debouncedLogic, debouncedStartDate, debouncedEndDate, controller.signal),
+      getScopePeriodComparison(debouncedFilters, debouncedLogic, debouncedEndDate, "month", controller.signal),
+      getScopePeriodComparison(debouncedFilters, debouncedLogic, debouncedEndDate, "week", controller.signal),
     ])
       .then(([result, month, week]) => {
         if (!cancelled) { setData(result); setPeriods({ month, week }); }
+      })
+      .catch((error) => {
+        if (!cancelled && error?.code !== "ERR_CANCELED") setData(null);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
     return () => {
       cancelled = true;
+      controller.abort();
     };
   }, [debouncedFilters, debouncedLogic, debouncedStartDate, debouncedEndDate]);
 

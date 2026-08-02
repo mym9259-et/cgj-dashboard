@@ -112,6 +112,7 @@ class Lead(Base):
         Index("ix_leads_gender", "gender"),
         Index("ix_leads_age_group", "age_group"),
         Index("ix_leads_customer_source", "customer_source"),
+        Index("ix_leads_delivery_date", "delivery_date"),
         Index("ix_leads_sales_deal", "salesperson", "deal_status"),
         Index("ix_leads_time_deal", "create_time", "deal_status"),
         Index("ix_leads_brand_model", "brand", "model_series"),

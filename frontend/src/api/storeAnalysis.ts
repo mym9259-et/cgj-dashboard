@@ -82,13 +82,13 @@ export async function getStoreOverview(
   return data;
 }
 
-export async function getScopePeriodComparison(filters: FilterItem[], filterLogic: "AND" | "OR", endDate: string | null, granularity: "month" | "week"): Promise<StorePeriodComparison> {
+export async function getScopePeriodComparison(filters: FilterItem[], filterLogic: "AND" | "OR", endDate: string | null, granularity: "month" | "week", signal?: AbortSignal): Promise<StorePeriodComparison> {
   const { data } = await apiClient.get("/store-analysis/scope-period-comparison", { params: {
     filters: filters.length ? JSON.stringify(filters) : undefined,
     filter_logic: filterLogic,
     end_date: endDate || undefined,
     granularity,
-  } });
+  }, signal });
   return data;
 }
 

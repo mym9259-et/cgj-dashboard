@@ -16,7 +16,7 @@ MAPPING_CONFIG = {
         "model": StoreMapping,
         "key": "merchant_name",
         "columns": ["merchant_name", "lingpao_region", "province", "city", "is_lingpao", "store_manager", "dealer_direct", "store_mode"],
-        "labels": ["商户名称", "大区", "省份", "城市", "是否零售", "门店总经理", "经销商/直营", "模式"],
+        "labels": ["商户名称", "大区", "省份", "城市", "是否零跑", "门店总经理", "经销商/直营", "模式"],
     },
     "car-series": {
         "model": CarSeriesMapping,

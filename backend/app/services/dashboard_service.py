@@ -182,7 +182,37 @@ async def get_kpi_data(
     """
     clauses, needs_join = _build_where_clauses(filters, filter_logic, start_date, end_date)
 
-    total = await db.scalar(_count(clauses, needs_join)) or 0
+    aggregate_stmt = select(
+        func.count().label("total"),
+        func.count().filter(Lead.contact_status == CONTACT_STATUS_REACHED).label("contacted"),
+        func.count().filter(Lead.deal_status == DEAL_STATUS_SUCCESS).label("deals"),
+        func.coalesce(
+            func.sum(Lead.deal_amount).filter(Lead.deal_status == DEAL_STATUS_SUCCESS),
+            0,
+        ).label("revenue"),
+        func.count().filter(Lead.deal_status == "已退款").label("refunds"),
+        func.coalesce(
+            func.sum(Lead.refund_amount).filter(Lead.deal_status == "已退款"),
+            0,
+        ).label("refund_amount"),
+        func.count().filter(
+            Lead.deal_status == DEAL_STATUS_SUCCESS,
+            Lead.product_years.in_(["5"]),
+        ).label("five_year_deals"),
+        func.count().filter(
+            Lead.deal_status == DEAL_STATUS_SUCCESS,
+            Lead.product_type == "无忧产品",
+        ).label("wuyou_deals"),
+        func.count().filter(
+            Lead.deal_status == DEAL_STATUS_SUCCESS,
+            Lead.product_type == "无忧产品",
+            Lead.product_years.in_(["5"]),
+        ).label("wuyou_five_year_deals"),
+    ).select_from(Lead)
+    aggregate_stmt = _apply_store_join_if_needed(aggregate_stmt, needs_join)
+    aggregate_stmt = _apply_clauses(aggregate_stmt, clauses)
+    aggregate_row = (await db.execute(aggregate_stmt)).one()
+    total = aggregate_row.total or 0
 
     if total == 0:
         return {
@@ -200,21 +230,16 @@ async def get_kpi_data(
             "contact_rate": 0.0,
         }
 
-    contacted = await db.scalar(_count(clauses, needs_join, [Lead.contact_status == "已触客"])) or 0
-    deals = await db.scalar(_count(clauses, needs_join, [Lead.deal_status == "已成交"])) or 0
-
-    revenue = await db.scalar(_sum(Lead.deal_amount, clauses + [Lead.deal_status == "已成交"], needs_join)) or 0
-    revenue = float(revenue)
-
-    refunds = await db.scalar(_count(clauses, needs_join, [Lead.deal_status == "已退款"])) or 0
-    refund_amount = await db.scalar(_sum(Lead.refund_amount, clauses + [Lead.deal_status == "已退款"], needs_join)) or 0
-    refund_amount = float(refund_amount)
-
-    five_year_deals = await db.scalar(_count(clauses, needs_join, [Lead.deal_status == DEAL_STATUS_SUCCESS, Lead.product_years.in_(["5"])])) or 0
+    contacted = aggregate_row.contacted or 0
+    deals = aggregate_row.deals or 0
+    revenue = float(aggregate_row.revenue or 0)
+    refunds = aggregate_row.refunds or 0
+    refund_amount = float(aggregate_row.refund_amount or 0)
+    five_year_deals = aggregate_row.five_year_deals or 0
     five_year_ratio = round(five_year_deals / deals, 4) if deals > 0 else 0.0
 
-    wuyou_deals = await db.scalar(_count(clauses, needs_join, [Lead.deal_status == DEAL_STATUS_SUCCESS, Lead.product_type == "无忧产品"])) or 0
-    wuyou_five_year_deals = await db.scalar(_count(clauses, needs_join, [Lead.deal_status == DEAL_STATUS_SUCCESS, Lead.product_type == "无忧产品", Lead.product_years.in_(["5"])])) or 0
+    wuyou_deals = aggregate_row.wuyou_deals or 0
+    wuyou_five_year_deals = aggregate_row.wuyou_five_year_deals or 0
     wuyou_five_year_ratio = round(wuyou_five_year_deals / wuyou_deals, 4) if wuyou_deals > 0 else 0.0
 
     first_store_dates = (
@@ -230,26 +255,39 @@ async def get_kpi_data(
         .group_by(Lead.merchant_name)
         .subquery()
     )
-    new_store_stmt = (
-        select(func.count(func.distinct(Lead.merchant_name)))
-        .select_from(Lead)
-        .join(first_store_dates, Lead.merchant_name == first_store_dates.c.store_name)
-    )
-    new_store_stmt = _apply_store_join_if_needed(new_store_stmt, needs_join)
-    new_store_stmt = _apply_clauses(new_store_stmt, clauses).where(
-        Lead.merchant_name.isnot(None), Lead.merchant_name != ""
-    )
-    if start_date:
-        new_store_stmt = new_store_stmt.where(first_store_dates.c.first_record_date >= start_date)
-    if end_date:
-        new_store_stmt = new_store_stmt.where(first_store_dates.c.first_record_date <= end_date)
-    new_operating_store_count = await db.scalar(new_store_stmt) or 0
-    active_store_stmt = select(func.count(func.distinct(Lead.merchant_name))).select_from(Lead)
-    active_store_stmt = _apply_store_join_if_needed(active_store_stmt, needs_join)
-    active_store_stmt = _apply_clauses(active_store_stmt, clauses).where(
-        Lead.merchant_name.isnot(None), Lead.merchant_name != ""
-    )
-    active_store_count = await db.scalar(active_store_stmt) or 0
+    if not start_date and not end_date:
+        store_count_stmt = select(
+            func.count(func.distinct(Lead.merchant_name)).label("active_store_count"),
+            func.count(func.distinct(Lead.merchant_name)).label("new_operating_store_count"),
+        ).select_from(Lead)
+        store_count_stmt = _apply_store_join_if_needed(store_count_stmt, needs_join)
+        store_count_stmt = _apply_clauses(store_count_stmt, clauses).where(
+            Lead.merchant_name.isnot(None), Lead.merchant_name != ""
+        )
+    else:
+        store_candidates_stmt = select(Lead.merchant_name.label("store_name")).select_from(Lead)
+        store_candidates_stmt = _apply_store_join_if_needed(store_candidates_stmt, needs_join)
+        store_candidates_stmt = _apply_clauses(store_candidates_stmt, clauses).where(
+            Lead.merchant_name.isnot(None), Lead.merchant_name != ""
+        ).distinct()
+        store_candidates = store_candidates_stmt.subquery()
+        new_store_conditions = []
+        if start_date:
+            new_store_conditions.append(first_store_dates.c.first_record_date >= start_date)
+        if end_date:
+            new_store_conditions.append(first_store_dates.c.first_record_date <= end_date)
+        new_store_condition = and_(*new_store_conditions)
+        store_count_stmt = (
+            select(
+                func.count().label("active_store_count"),
+                func.count().filter(new_store_condition).label("new_operating_store_count"),
+            )
+            .select_from(store_candidates)
+            .join(first_store_dates, store_candidates.c.store_name == first_store_dates.c.store_name)
+        )
+    store_count_row = (await db.execute(store_count_stmt)).one()
+    new_operating_store_count = store_count_row.new_operating_store_count or 0
+    active_store_count = store_count_row.active_store_count or 0
 
     first_salesperson_dates = (
         select(
@@ -265,42 +303,50 @@ async def get_kpi_data(
         .subquery()
     )
 
-    role_stmt = (
-        select(
+    if not start_date and not end_date:
+        role_stmt = select(
             func.count(func.distinct(Lead.salesperson)).label("active_salesperson_count"),
             func.count(func.distinct(Lead.salesperson)).filter(PersonnelMapping.role == "车管家").label("car_manager_count"),
             func.count(func.distinct(Lead.salesperson)).filter(PersonnelMapping.role == "平台教练").label("platform_coach_count"),
             func.count(func.distinct(Lead.salesperson)).filter(PersonnelMapping.role == "认证教练").label("certified_coach_count"),
-        )
-        .select_from(Lead)
-        .outerjoin(PersonnelMapping, Lead.salesperson == PersonnelMapping.salesperson)
-    )
-    role_stmt = _apply_store_join_if_needed(role_stmt, needs_join)
-    role_stmt = _apply_clauses(role_stmt, clauses).where(
-        Lead.salesperson.isnot(None), Lead.salesperson != ""
-    )
-    role_row = (await db.execute(role_stmt)).one()
-
-    new_role_stmt = (
-        select(
             func.count(func.distinct(Lead.salesperson)).label("new_salesperson_count"),
             func.count(func.distinct(Lead.salesperson)).filter(PersonnelMapping.role == "车管家").label("new_car_manager_count"),
             func.count(func.distinct(Lead.salesperson)).filter(PersonnelMapping.role == "平台教练").label("new_platform_coach_count"),
             func.count(func.distinct(Lead.salesperson)).filter(PersonnelMapping.role == "认证教练").label("new_certified_coach_count"),
+        ).select_from(Lead).outerjoin(PersonnelMapping, Lead.salesperson == PersonnelMapping.salesperson)
+        role_stmt = _apply_store_join_if_needed(role_stmt, needs_join)
+        role_stmt = _apply_clauses(role_stmt, clauses).where(
+            Lead.salesperson.isnot(None), Lead.salesperson != ""
         )
-        .select_from(Lead)
-        .join(first_salesperson_dates, Lead.salesperson == first_salesperson_dates.c.salesperson)
-        .outerjoin(PersonnelMapping, Lead.salesperson == PersonnelMapping.salesperson)
-    )
-    new_role_stmt = _apply_store_join_if_needed(new_role_stmt, needs_join)
-    new_role_stmt = _apply_clauses(new_role_stmt, clauses).where(
-        Lead.salesperson.isnot(None), Lead.salesperson != ""
-    )
-    if start_date:
-        new_role_stmt = new_role_stmt.where(first_salesperson_dates.c.first_record_date >= start_date)
-    if end_date:
-        new_role_stmt = new_role_stmt.where(first_salesperson_dates.c.first_record_date <= end_date)
-    new_role_row = (await db.execute(new_role_stmt)).one()
+    else:
+        salesperson_candidates_stmt = select(Lead.salesperson.label("salesperson")).select_from(Lead)
+        salesperson_candidates_stmt = _apply_store_join_if_needed(salesperson_candidates_stmt, needs_join)
+        salesperson_candidates_stmt = _apply_clauses(salesperson_candidates_stmt, clauses).where(
+            Lead.salesperson.isnot(None), Lead.salesperson != ""
+        ).distinct()
+        salesperson_candidates = salesperson_candidates_stmt.subquery()
+        new_salesperson_conditions = []
+        if start_date:
+            new_salesperson_conditions.append(first_salesperson_dates.c.first_record_date >= start_date)
+        if end_date:
+            new_salesperson_conditions.append(first_salesperson_dates.c.first_record_date <= end_date)
+        new_salesperson_condition = and_(*new_salesperson_conditions)
+        role_stmt = (
+            select(
+                func.count().label("active_salesperson_count"),
+                func.count().filter(PersonnelMapping.role == "车管家").label("car_manager_count"),
+                func.count().filter(PersonnelMapping.role == "平台教练").label("platform_coach_count"),
+                func.count().filter(PersonnelMapping.role == "认证教练").label("certified_coach_count"),
+                func.count().filter(new_salesperson_condition).label("new_salesperson_count"),
+                func.count().filter(new_salesperson_condition, PersonnelMapping.role == "车管家").label("new_car_manager_count"),
+                func.count().filter(new_salesperson_condition, PersonnelMapping.role == "平台教练").label("new_platform_coach_count"),
+                func.count().filter(new_salesperson_condition, PersonnelMapping.role == "认证教练").label("new_certified_coach_count"),
+            )
+            .select_from(salesperson_candidates)
+            .join(first_salesperson_dates, salesperson_candidates.c.salesperson == first_salesperson_dates.c.salesperson)
+            .outerjoin(PersonnelMapping, salesperson_candidates.c.salesperson == PersonnelMapping.salesperson)
+        )
+    role_row = (await db.execute(role_stmt)).one()
 
     series_columns = []
     for key, clean_series in SERIES_GROUPS.items():
@@ -344,11 +390,11 @@ async def get_kpi_data(
         "total_leads": total,
         "new_operating_store_count": new_operating_store_count,
         "active_store_count": active_store_count,
-        "new_salesperson_count": new_role_row.new_salesperson_count or 0,
+        "new_salesperson_count": role_row.new_salesperson_count or 0,
         "active_salesperson_count": role_row.active_salesperson_count or 0,
-        "new_car_manager_count": new_role_row.new_car_manager_count or 0,
-        "new_platform_coach_count": new_role_row.new_platform_coach_count or 0,
-        "new_certified_coach_count": new_role_row.new_certified_coach_count or 0,
+        "new_car_manager_count": role_row.new_car_manager_count or 0,
+        "new_platform_coach_count": role_row.new_platform_coach_count or 0,
+        "new_certified_coach_count": role_row.new_certified_coach_count or 0,
         "car_manager_count": role_row.car_manager_count or 0,
         "platform_coach_count": role_row.platform_coach_count or 0,
         "certified_coach_count": role_row.certified_coach_count or 0,

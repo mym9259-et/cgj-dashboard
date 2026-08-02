@@ -44,3 +44,8 @@ async def init_db():
                 await conn.execute(
                     text(f"ALTER TABLE store_mappings ADD COLUMN {column_name} VARCHAR(100)")
                 )
+        # create_all does not add indexes to existing tables. Dashboard date
+        # filters all use delivery_date, so ensure deployed databases get it.
+        await conn.execute(
+            text("CREATE INDEX IF NOT EXISTS ix_leads_delivery_date ON leads (delivery_date)")
+        )

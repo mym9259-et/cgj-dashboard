@@ -11,6 +11,12 @@ class StoreMappingFieldsTest(unittest.TestCase):
         self.assertEqual(field_map["经销商/直营"], "dealer_direct")
         self.assertEqual(field_map["模式"], "store_mode")
 
+    def test_lingpao_column_accepts_current_and_legacy_headers(self):
+        field_map = _build_field_map(["是否零跑", "是否零售"])
+
+        self.assertEqual(field_map["是否零跑"], "is_lingpao")
+        self.assertEqual(field_map["是否零售"], "is_lingpao")
+
     def test_new_fields_are_available_to_dashboard_filters(self):
         self.assertEqual(STORE_MAPPING_FIELDS["dealer_direct"], "dealer_direct")
         self.assertEqual(STORE_MAPPING_FIELDS["store_mode"], "store_mode")
